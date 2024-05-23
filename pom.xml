@@ -9,7 +9,7 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.rookie.bigdata</groupId>
-    <artifactId>rookie-authorization</artifactId>
+    <artifactId>rookie-new-authorization</artifactId>
     <version>0.0.1</version>
 
     <packaging>pom</packaging>
