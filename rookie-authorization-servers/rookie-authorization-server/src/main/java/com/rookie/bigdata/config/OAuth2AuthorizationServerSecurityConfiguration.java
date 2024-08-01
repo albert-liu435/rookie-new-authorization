@@ -8,6 +8,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.annotation.Secured;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -67,7 +68,6 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
     SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http) throws Exception {
 
 
-
         // 配置默认的设置，忽略认证端点的csrf校验
         OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http);
 
@@ -108,6 +108,17 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
                                 .authenticated()
                 )
                 .formLogin(withDefaults());
+//        // 指定登录页面,
+//                .formLogin(formLogin ->
+//                formLogin.loginPage("/login")
+//        );
+
+        // 指定登录页面,因为默认为/login，所以这里应该也可以写成
+//                .formLogin(Customizer.withDefaults());
+
+        // 添加BearerTokenAuthenticationFilter，将认证服务当做一个资源服务，解析请求头中的token
+        http.oauth2ResourceServer((resourceServer) -> resourceServer
+                .jwt(Customizer.withDefaults()));
         return http.build();
     }
 
@@ -116,4 +127,17 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
         requestMatcher.setIgnoredMediaTypes(Set.of(MediaType.ALL));
         return requestMatcher;
     }
+
+    @Bean
+    public UserDetailsService userDetailsService() {
+        UserDetails userDetails = User.withDefaultPasswordEncoder()
+                .username("user")
+                .password("password")
+                .roles("admin", "normal", "unAuthentication")
+                .authorities("app", "web", "/test2", "/test3")
+                .build();
+
+        return new InMemoryUserDetailsManager(userDetails);
+    }
+
 }
