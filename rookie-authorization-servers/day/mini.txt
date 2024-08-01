@@ -1,4 +1,8 @@
 最小配置为在Springboot项目中配置如下yml文件 参考项目分支 feature/day01
+
+在yml文件中配置如下：
+配置授权服务器的用户名和密码，配置客户端的客户端ID,客户端密钥，客户端的认证方式为请求头的认证,配置资源服务器使用该客户端获取授权时支持的方式,授权码模式回调地址，oauth2.1已改为精准匹配，不能只设置域名，并且屏蔽了localhost，本机使用127.0.0.1访问, 该客户端的授权范围，OPENID与PROFILE是IdToken的scope，获取授权时请求OPENID的scope时认证服务会返回IdToken,客户端设置，require-authorization-consent设置用户需要确认授权
+
 server:
   port: 8080
 
@@ -35,6 +39,138 @@ spring:
   profiles:
     active: dev
 
+
+配置好以后进行springboot启动时首先执行如下代码
+@Configuration(proxyBeanMethods = false)
+@EnableConfigurationProperties(OAuth2AuthorizationServerProperties.class)
+class OAuth2AuthorizationServerConfiguration {
+
+	private final OAuth2AuthorizationServerPropertiesMapper propertiesMapper;
+
+	OAuth2AuthorizationServerConfiguration(OAuth2AuthorizationServerProperties properties) {
+		this.propertiesMapper = new OAuth2AuthorizationServerPropertiesMapper(properties);
+	}
+
+	@Bean
+	@ConditionalOnMissingBean
+	@Conditional(RegisteredClientsConfiguredCondition.class)
+	RegisteredClientRepository registeredClientRepository() {
+		return new InMemoryRegisteredClientRepository(this.propertiesMapper.asRegisteredClients());
+	}
+
+	@Bean
+	@ConditionalOnMissingBean
+	AuthorizationServerSettings authorizationServerSettings() {
+		return this.propertiesMapper.asAuthorizationServerSettings();
+	}
+
+}
+
+实例化InMemoryRegisteredClientRepository，用于在内存中存储RegisteredClient,即加载yml文件中的配置为RegisteredClient并加载到内存中，用于在进行客户端进行授权时进行匹配使用
+实例化AuthorizationServerSettings,用于授权服务器配置设置的工具类,里面为一个map结构，存放了一些对应关系，如图1722492548545.png
+
+接下来会配置授权服务
+@Configuration(proxyBeanMethods = false)
+@ConditionalOnDefaultWebSecurity
+@ConditionalOnBean({ RegisteredClientRepository.class, AuthorizationServerSettings.class })
+class OAuth2AuthorizationServerWebSecurityConfiguration {
+
+
+    /**
+     * 配置端点的过滤器链
+     *
+     * @param http spring security核心配置类
+     * @return 过滤器链
+     * @throws Exception 抛出
+     */
+	@Bean
+	@Order(Ordered.HIGHEST_PRECEDENCE)
+	SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http) throws Exception {
+	    // 配置默认的设置，忽略认证端点的csrf校验
+		OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http);
+		// 开启OpenID Connect 1.0协议相关端点
+		http.getConfigurer(OAuth2AuthorizationServerConfigurer.class).oidc(withDefaults());
+		// 处理使用access token访问用户信息端点和客户端注册端点
+		http.oauth2ResourceServer((resourceServer) -> resourceServer.jwt(withDefaults()));
+		// 当未登录时访问认证端点时重定向至login页面
+		http.exceptionHandling((exceptions) -> exceptions.defaultAuthenticationEntryPointFor(
+				new LoginUrlAuthenticationEntryPoint("/login"), createRequestMatcher()));
+		return http.build();
+	}
+
+    /**
+     * 配置认证相关的过滤器链
+     *
+     * @param http spring security核心配置类
+     * @return 过滤器链
+     * @throws Exception 抛出
+     */
+	@Bean
+	@Order(SecurityProperties.BASIC_AUTH_ORDER)
+	SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
+		http.authorizeHttpRequests((authorize) -> authorize.anyRequest().authenticated()).formLogin(withDefaults());
+		return http.build();
+	}
+
+	private static RequestMatcher createRequestMatcher() {
+		MediaTypeRequestMatcher requestMatcher = new MediaTypeRequestMatcher(MediaType.TEXT_HTML);
+		requestMatcher.setIgnoredMediaTypes(Set.of(MediaType.ALL));
+		return requestMatcher;
+	}
+
+}
+
+
+用于实例化JwtDecoder和JWKSource,采用RSA的方式进行token加密与解密
+
+@AutoConfiguration(after = UserDetailsServiceAutoConfiguration.class)
+@ConditionalOnClass(OAuth2Authorization.class)
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
+public class OAuth2AuthorizationServerJwtAutoConfiguration {
+
+	@Bean
+	@ConditionalOnClass(JwtDecoder.class)
+	@ConditionalOnMissingBean
+	JwtDecoder jwtDecoder(JWKSource<SecurityContext> jwkSource) {
+		return OAuth2AuthorizationServerConfiguration.jwtDecoder(jwkSource);
+	}
+
+	@Bean
+	@Role(BeanDefinition.ROLE_INFRASTRUCTURE)
+	@ConditionalOnMissingBean
+	JWKSource<SecurityContext> jwkSource() {
+		RSAKey rsaKey = getRsaKey();
+		JWKSet jwkSet = new JWKSet(rsaKey);
+		return new ImmutableJWKSet<>(jwkSet);
+	}
+
+	private static RSAKey getRsaKey() {
+		KeyPair keyPair = generateRsaKey();
+		RSAPublicKey publicKey = (RSAPublicKey) keyPair.getPublic();
+		RSAPrivateKey privateKey = (RSAPrivateKey) keyPair.getPrivate();
+		RSAKey rsaKey = new RSAKey.Builder(publicKey).privateKey(privateKey)
+			.keyID(UUID.randomUUID().toString())
+			.build();
+		return rsaKey;
+	}
+
+	private static KeyPair generateRsaKey() {
+		KeyPair keyPair;
+		try {
+			KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
+			keyPairGenerator.initialize(2048);
+			keyPair = keyPairGenerator.generateKeyPair();
+		}
+		catch (Exception ex) {
+			throw new IllegalStateException(ex);
+		}
+		return keyPair;
+	}
+
+}
+
+
+
 查看org.springframework.boot.autoconfigure.security.oauth2.server.servlet.OAuth2AuthorizationServerWebSecurityConfiguration中有一段代码如下：
         // 配置默认的设置，忽略认证端点的csrf校验
         OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http);
@@ -61,14 +197,53 @@ spring:
 OAuth2AuthorizationServerConfigurer
 OAuth2AuthorizationServerConfigurer提供完全自定义 OAuth2 授权服务器安全配置的功能,它允许您指定要使用的核心组件 - 例如RegisteredClientRepository等 。它还允许您自定义协议端点的请求处理逻辑 - 例如，授权端点、设备授权端点、设备验证端点、令牌端点、令牌自检端点OAuth2AuthorizationService等。
 
+
 请求:http://127.0.0.1:8080/oauth2/authorize?client_id=messaging-client&response_type=code&scope=message.read&redirect_uri=https://www.baidu.com
-通过OAuth2AuthorizationEndpointFilter过滤器进行处理，处理过程如下：
-1、判断是否匹配该请求，默认为，默认匹配uri为/oauth2/authorize,方法为GET或者POST等等还有其他条件
+通过的过滤器如下：
+Security filter chain: [
+  DisableEncodeUrlFilter
+  WebAsyncManagerIntegrationFilter
+  SecurityContextHolderFilter
+  AuthorizationServerContextFilter
+  HeaderWriterFilter
+  CorsFilter
+  CsrfFilter
+  LogoutFilter
+  OAuth2AuthorizationServerMetadataEndpointFilter
+  OAuth2AuthorizationEndpointFilter
+  OAuth2DeviceVerificationEndpointFilter
+  NimbusJwkSetEndpointFilter
+  OAuth2ClientAuthenticationFilter
+  BearerTokenAuthenticationFilter
+  RequestCacheAwareFilter
+  SecurityContextHolderAwareRequestFilter
+  AnonymousAuthenticationFilter
+  ExceptionTranslationFilter
+  AuthorizationFilter
+  OAuth2TokenEndpointFilter
+  OAuth2TokenIntrospectionEndpointFilter
+  OAuth2TokenRevocationEndpointFilter
+  OAuth2DeviceAuthorizationEndpointFilter
+]
+分析主要的过滤器OAuth2AuthorizationEndpointFilter，该过滤器用来处理请求授权码的
+
+1、判断是否匹配该请求，默认为匹配uri为/oauth2/authorize,除了匹配该uri，还会匹配方法等信息
 2、匹配成功的话，将请求转换为相应的Authentication,默认为OAuth2AuthorizationCodeRequestAuthenticationToken，默认采用DelegatingAuthenticationConverter委托类，里面包含了OAuth2AuthorizationCodeRequestAuthenticationConverter和OAuth2AuthorizationConsentAuthenticationConverter转换后的Authentication如图1722505646838.png
 3、进行认证管理器进行认证，默认最终通过OAuth2AuthorizationCodeRequestAuthenticationProvider进行认证，由于是匿名，所以会认证失败
 4、认证失败后，会进行到下一个过滤器。最终通过异常过滤器，将请求重定向到login登录页面
 5、重定向到登录页面，我们在浏览器页面输入账号密码后进行第二次经过OAuth2AuthorizationEndpointFilter过滤器。此时因为存在账号和密码，会认证通过，最终会调用OAuth2AuthorizationEndpointFilter#sendAuthorizationConsent()方法,并重定向到页面如图1722496440753.png
 6、当我们选中message.read并点击Submit Consent,此时会第三次进入到OAuth2AuthorizationEndpointFilter,此时进过验证后的Authentication为OAuth2AuthorizationCodeRequestAuthenticationToken，最终通过AuthenticationSuccessHandler进行重定向并携带有code
+本实例会重定向到：https://www.baidu.com/?code=QMwLCkGxTkL0aPtllN79uv0nGfJd0-wJ-ipDhyCXaYIEBRzW-f9v3TaGwgMzlZgSqnal6eYgjNamxJVpR4cba5Of17mSCuj-StM7ga3jGmd_Nb2ovA7qGo2eOfh-viKz
+
+我们需要根据code换取token已经refresh toeken
+http://127.0.0.1:8080/oauth2/token
+Auth type采用 Basic Auth messaging-client:secret
+如图：1722518737694.png
+此时我们主要看OAuth2TokenEndpointFilter过滤器
+1、首先判断匹配/oauth2/token请求，匹配成功则进行处理，否则进行到下一个过滤器
+2、获取请求参数grantTypes，此时为authorization_code,同时根据AuthenticationConverter将请求转换Authentication,此时的AuthenticationConverter为DelegatingAuthenticationConverter，里面封装了OAuth2AuthorizationCodeAuthenticationConverter，OAuth2RefreshTokenAuthenticationConverter，OAuth2ClientCredentialsAuthenticationConverter和OAuth2DeviceCodeAuthenticationConverter，分别对应转换不同的请求，转换后的Authentication为OAuth2AuthorizationCodeAuthenticationToken。
+3、进行认证管理器进行认证，默认最终通过OAuth2AuthorizationCodeAuthenticationProvider进行认证，认证成功后生成OAuth2AccessTokenAuthenticationToken，然后调用  OAuth2TokenEndpointFilter#sendAccessTokenResponse()方法
+4、
 
 
 OAuth2TokenEndpointFilter,OAuth2AuthorizationCodeAuthenticationProvider

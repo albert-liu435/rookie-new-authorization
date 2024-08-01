@@ -9,9 +9,9 @@ server:
 
 spring:
   security:
-    user:
-      name: user1
-      password: password
+#    user:
+#      name: user1
+#      password: password
     oauth2:
       authorizationserver:
         client:

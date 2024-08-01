@@ -9,10 +9,7 @@ public final class OAuth2AuthorizationServerConfigurer
 
 
 	/**
-	 * Sets the repository of registered clients.
-	 *
-	 * @param registeredClientRepository the repository of registered clients
-	 * @return the {@link OAuth2AuthorizationServerConfigurer} for further configuration
+	 * 设置注册的RegisteredClientRepository
 	 */
 	public OAuth2AuthorizationServerConfigurer registeredClientRepository(RegisteredClientRepository registeredClientRepository) {
 		Assert.notNull(registeredClientRepository, "registeredClientRepository cannot be null");
@@ -21,10 +18,7 @@ public final class OAuth2AuthorizationServerConfigurer
 	}
 
 	/**
-	 * Sets the authorization service.
-	 *
-	 * @param authorizationService the authorization service
-	 * @return the {@link OAuth2AuthorizationServerConfigurer} for further configuration
+	 * 设置OAuth2AuthorizationService
 	 */
 	public OAuth2AuthorizationServerConfigurer authorizationService(OAuth2AuthorizationService authorizationService) {
 		Assert.notNull(authorizationService, "authorizationService cannot be null");
@@ -33,10 +27,7 @@ public final class OAuth2AuthorizationServerConfigurer
 	}
 
 	/**
-	 * Sets the authorization consent service.
-	 *
-	 * @param authorizationConsentService the authorization consent service
-	 * @return the {@link OAuth2AuthorizationServerConfigurer} for further configuration
+	 * 设置OAuth2AuthorizationConsentService
 	 */
 	public OAuth2AuthorizationServerConfigurer authorizationConsentService(OAuth2AuthorizationConsentService authorizationConsentService) {
 		Assert.notNull(authorizationConsentService, "authorizationConsentService cannot be null");
@@ -45,10 +36,7 @@ public final class OAuth2AuthorizationServerConfigurer
 	}
 
 	/**
-	 * Sets the authorization server settings.
-	 *
-	 * @param authorizationServerSettings the authorization server settings
-	 * @return the {@link OAuth2AuthorizationServerConfigurer} for further configuration
+	 * 设置AuthorizationServerSettings
 	 */
 	public OAuth2AuthorizationServerConfigurer authorizationServerSettings(AuthorizationServerSettings authorizationServerSettings) {
 		Assert.notNull(authorizationServerSettings, "authorizationServerSettings cannot be null");
@@ -57,11 +45,7 @@ public final class OAuth2AuthorizationServerConfigurer
 	}
 
 	/**
-	 * Sets the token generator.
-	 *
-	 * @param tokenGenerator the token generator
-	 * @return the {@link OAuth2AuthorizationServerConfigurer} for further configuration
-	 * @since 0.2.3
+	 * 设置OAuth2TokenGenerator用于生成token
 	 */
 	public OAuth2AuthorizationServerConfigurer tokenGenerator(OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator) {
 		Assert.notNull(tokenGenerator, "tokenGenerator cannot be null");
@@ -70,10 +54,7 @@ public final class OAuth2AuthorizationServerConfigurer
 	}
 
 	/**
-	 * Configures OAuth 2.0 Client Authentication.
-	 *
-	 * @param clientAuthenticationCustomizer the {@link Customizer} providing access to the {@link OAuth2ClientAuthenticationConfigurer}
-	 * @return the {@link OAuth2AuthorizationServerConfigurer} for further configuration
+	 * 配置OAuth2ClientAuthenticationConfigurer
 	 */
 	public OAuth2AuthorizationServerConfigurer clientAuthentication(Customizer<OAuth2ClientAuthenticationConfigurer> clientAuthenticationCustomizer) {
 		clientAuthenticationCustomizer.customize(getConfigurer(OAuth2ClientAuthenticationConfigurer.class));
@@ -81,11 +62,7 @@ public final class OAuth2AuthorizationServerConfigurer
 	}
 
 	/**
-	 * Configures the OAuth 2.0 Authorization Server Metadata Endpoint.
-	 *
-	 * @param authorizationServerMetadataEndpointCustomizer the {@link Customizer} providing access to the {@link OAuth2AuthorizationServerMetadataEndpointConfigurer}
-	 * @return the {@link OAuth2AuthorizationServerConfigurer} for further configuration
-	 * @since 0.4.0
+	 * 配置OAuth2AuthorizationServerMetadataEndpointConfigurer
 	 */
 	public OAuth2AuthorizationServerConfigurer authorizationServerMetadataEndpoint(Customizer<OAuth2AuthorizationServerMetadataEndpointConfigurer> authorizationServerMetadataEndpointCustomizer) {
 		authorizationServerMetadataEndpointCustomizer.customize(getConfigurer(OAuth2AuthorizationServerMetadataEndpointConfigurer.class));
@@ -93,10 +70,7 @@ public final class OAuth2AuthorizationServerConfigurer
 	}
 
 	/**
-	 * Configures the OAuth 2.0 Authorization Endpoint.
-	 *
-	 * @param authorizationEndpointCustomizer the {@link Customizer} providing access to the {@link OAuth2AuthorizationEndpointConfigurer}
-	 * @return the {@link OAuth2AuthorizationServerConfigurer} for further configuration
+	 * 配置OAuth2AuthorizationEndpointConfigurer
 	 */
 	public OAuth2AuthorizationServerConfigurer authorizationEndpoint(Customizer<OAuth2AuthorizationEndpointConfigurer> authorizationEndpointCustomizer) {
 		authorizationEndpointCustomizer.customize(getConfigurer(OAuth2AuthorizationEndpointConfigurer.class));
@@ -104,10 +78,7 @@ public final class OAuth2AuthorizationServerConfigurer
 	}
 
 	/**
-	 * Configures the OAuth 2.0 Token Endpoint.
-	 *
-	 * @param tokenEndpointCustomizer the {@link Customizer} providing access to the {@link OAuth2TokenEndpointConfigurer}
-	 * @return the {@link OAuth2AuthorizationServerConfigurer} for further configuration
+	 * 配置OAuth2TokenEndpointConfigurer
 	 */
 	public OAuth2AuthorizationServerConfigurer tokenEndpoint(Customizer<OAuth2TokenEndpointConfigurer> tokenEndpointCustomizer) {
 		tokenEndpointCustomizer.customize(getConfigurer(OAuth2TokenEndpointConfigurer.class));
@@ -115,11 +86,7 @@ public final class OAuth2AuthorizationServerConfigurer
 	}
 
 	/**
-	 * Configures the OAuth 2.0 Token Introspection Endpoint.
-	 *
-	 * @param tokenIntrospectionEndpointCustomizer the {@link Customizer} providing access to the {@link OAuth2TokenIntrospectionEndpointConfigurer}
-	 * @return the {@link OAuth2AuthorizationServerConfigurer} for further configuration
-	 * @since 0.2.3
+	 * 配置OAuth2TokenIntrospectionEndpointConfigurer
 	 */
 	public OAuth2AuthorizationServerConfigurer tokenIntrospectionEndpoint(Customizer<OAuth2TokenIntrospectionEndpointConfigurer> tokenIntrospectionEndpointCustomizer) {
 		tokenIntrospectionEndpointCustomizer.customize(getConfigurer(OAuth2TokenIntrospectionEndpointConfigurer.class));
@@ -127,11 +94,7 @@ public final class OAuth2AuthorizationServerConfigurer
 	}
 
 	/**
-	 * Configures the OAuth 2.0 Token Revocation Endpoint.
-	 *
-	 * @param tokenRevocationEndpointCustomizer the {@link Customizer} providing access to the {@link OAuth2TokenRevocationEndpointConfigurer}
-	 * @return the {@link OAuth2AuthorizationServerConfigurer} for further configuration
-	 * @since 0.2.2
+	 * 配置OAuth2TokenRevocationEndpointConfigurer
 	 */
 	public OAuth2AuthorizationServerConfigurer tokenRevocationEndpoint(Customizer<OAuth2TokenRevocationEndpointConfigurer> tokenRevocationEndpointCustomizer) {
 		tokenRevocationEndpointCustomizer.customize(getConfigurer(OAuth2TokenRevocationEndpointConfigurer.class));
@@ -139,11 +102,7 @@ public final class OAuth2AuthorizationServerConfigurer
 	}
 
 	/**
-	 * Configures the OAuth 2.0 Device Authorization Endpoint.
-	 *
-	 * @param deviceAuthorizationEndpointCustomizer the {@link Customizer} providing access to the {@link OAuth2DeviceAuthorizationEndpointConfigurer}
-	 * @return the {@link OAuth2AuthorizationServerConfigurer} for further configuration
-	 * @since 1.1
+	 *配置OAuth2DeviceAuthorizationEndpointConfigurer
 	 */
 	public OAuth2AuthorizationServerConfigurer deviceAuthorizationEndpoint(Customizer<OAuth2DeviceAuthorizationEndpointConfigurer> deviceAuthorizationEndpointCustomizer) {
 		deviceAuthorizationEndpointCustomizer.customize(getConfigurer(OAuth2DeviceAuthorizationEndpointConfigurer.class));
@@ -151,11 +110,7 @@ public final class OAuth2AuthorizationServerConfigurer
 	}
 
 	/**
-	 * Configures the OAuth 2.0 Device Verification Endpoint.
-	 *
-	 * @param deviceVerificationEndpointCustomizer the {@link Customizer} providing access to the {@link OAuth2DeviceVerificationEndpointConfigurer}
-	 * @return the {@link OAuth2AuthorizationServerConfigurer} for further configuration
-	 * @since 1.1
+	 * 配置OAuth2DeviceVerificationEndpointConfigurer
 	 */
 	public OAuth2AuthorizationServerConfigurer deviceVerificationEndpoint(Customizer<OAuth2DeviceVerificationEndpointConfigurer> deviceVerificationEndpointCustomizer) {
 		deviceVerificationEndpointCustomizer.customize(getConfigurer(OAuth2DeviceVerificationEndpointConfigurer.class));
@@ -163,10 +118,7 @@ public final class OAuth2AuthorizationServerConfigurer
 	}
 
 	/**
-	 * Configures OpenID Connect 1.0 support (disabled by default).
-	 *
-	 * @param oidcCustomizer the {@link Customizer} providing access to the {@link OidcConfigurer}
-	 * @return the {@link OAuth2AuthorizationServerConfigurer} for further configuration
+	 * 配置OidcConfigurer
 	 */
 	public OAuth2AuthorizationServerConfigurer oidc(Customizer<OidcConfigurer> oidcCustomizer) {
 		OidcConfigurer oidcConfigurer = getConfigurer(OidcConfigurer.class);
@@ -179,23 +131,26 @@ public final class OAuth2AuthorizationServerConfigurer
 	}
 
 	/**
-	 * Returns a {@link RequestMatcher} for the authorization server endpoints.
 	 *
-	 * @return a {@link RequestMatcher} for the authorization server endpoints
 	 */
 	public RequestMatcher getEndpointsMatcher() {
 		// Return a deferred RequestMatcher
 		// since endpointsMatcher is constructed in init(HttpSecurity).
 		return (request) -> this.endpointsMatcher.matches(request);
 	}
-
+    /**
+    *初始化操作
+    */
 	@Override
 	public void init(HttpSecurity httpSecurity) {
+	    //从容器中获取AuthorizationServerSettings
 		AuthorizationServerSettings authorizationServerSettings = OAuth2ConfigurerUtils.getAuthorizationServerSettings(httpSecurity);
+		//对AuthorizationServerSettings进行校验
 		validateAuthorizationServerSettings(authorizationServerSettings);
-
+        //是否配置OpenID Connect 1.0
 		if (isOidcEnabled()) {
 			// Add OpenID Connect session tracking capabilities.
+			//添加OpenID Connect session的追踪能力
 			initSessionRegistry(httpSecurity);
 			SessionRegistry sessionRegistry = httpSecurity.getSharedObject(SessionRegistry.class);
 			OAuth2AuthorizationEndpointConfigurer authorizationEndpointConfigurer =
@@ -230,6 +185,7 @@ public final class OAuth2AuthorizationServerConfigurer
 		}
 
 		List<RequestMatcher> requestMatchers = new ArrayList<>();
+		//对其他configurers进行初始化并设置RequestMatcher
 		this.configurers.values().forEach(configurer -> {
 			configurer.init(httpSecurity);
 			requestMatchers.add(configurer.getRequestMatcher());
@@ -238,6 +194,7 @@ public final class OAuth2AuthorizationServerConfigurer
 				authorizationServerSettings.getJwkSetEndpoint(), HttpMethod.GET.name()));
 		this.endpointsMatcher = new OrRequestMatcher(requestMatchers);
 
+        //ExceptionHandlingConfigurer 异常配置
 		ExceptionHandlingConfigurer<HttpSecurity> exceptionHandling = httpSecurity.getConfigurer(ExceptionHandlingConfigurer.class);
 		if (exceptionHandling != null) {
 			exceptionHandling.defaultAuthenticationEntryPointFor(
@@ -253,13 +210,14 @@ public final class OAuth2AuthorizationServerConfigurer
 
 	@Override
 	public void configure(HttpSecurity httpSecurity) {
+	    //配置其他各个configurers
 		this.configurers.values().forEach(configurer -> configurer.configure(httpSecurity));
 
 		AuthorizationServerSettings authorizationServerSettings = OAuth2ConfigurerUtils.getAuthorizationServerSettings(httpSecurity);
-
+        //初始化AuthorizationServerContext安全上下文过滤器，用于处理AuthorizationServerContext上下文
 		AuthorizationServerContextFilter authorizationServerContextFilter = new AuthorizationServerContextFilter(authorizationServerSettings);
 		httpSecurity.addFilterAfter(postProcess(authorizationServerContextFilter), SecurityContextHolderFilter.class);
-
+        //jwkSource并设置到NimbusJwkSetEndpointFilter过滤器中，用于进行过加密验证
 		JWKSource<com.nimbusds.jose.proc.SecurityContext> jwkSource = OAuth2ConfigurerUtils.getJwkSource(httpSecurity);
 		if (jwkSource != null) {
 			NimbusJwkSetEndpointFilter jwkSetEndpointFilter = new NimbusJwkSetEndpointFilter(
@@ -336,3 +294,12 @@ public final class OAuth2AuthorizationServerConfigurer
 
 }
 
+从源码中createConfigurers方法可以看到OAuth2AuthorizationServerConfigurer会配置如下的Configurer
+OAuth2ClientAuthenticationConfigurer:OAuth 2.0的客户端的认证配置
+OAuth2AuthorizationServerMetadataEndpointConfigurer:用于配置OAuth 2.0 认证服务元数据
+OAuth2AuthorizationEndpointConfigurer
+OAuth2TokenEndpointConfigurer
+OAuth2TokenIntrospectionEndpointConfigurer
+OAuth2TokenRevocationEndpointConfigurer
+OAuth2DeviceAuthorizationEndpointConfigurer
+OAuth2DeviceVerificationEndpointConfigurer
