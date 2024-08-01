@@ -56,7 +56,8 @@
             <level>debug</level>
         </filter>
         <encoder>
-            <Pattern>${CONSOLE_LOG_PATTERN}</Pattern>
+<!--            <Pattern>${CONSOLE_LOG_PATTERN}</Pattern>-->
+            <Pattern>${log.pattern}</Pattern>
             <!-- 设置字符集 -->
             <charset>UTF-8</charset>
         </encoder>
@@ -209,7 +210,7 @@
 
     <!-- 开发、测试环境 -->
     <springProfile name="dev,uat">
-        <logger name="org.springframework.web" level="debug"/>
+        <logger name="org.springframework" level="debug"/>
 <!--        <logger name="com.baomidou.mybatisplus" level="DEBUG"/>-->
       <!--  <logger name="com.bestseller.miniapp.pintuan.mapper" level="DEBUUG"/>-->
 <!--        <logger name="org.redisson" level="INFO"/>-->

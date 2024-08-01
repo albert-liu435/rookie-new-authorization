@@ -1,0 +1,74 @@
+最小配置为在Springboot项目中配置如下yml文件 参考项目分支 feature/day01
+server:
+  port: 8080
+
+spring:
+  security:
+    user:
+      name: user1
+      password: password
+    oauth2:
+      authorizationserver:
+        client:
+          messaging-client:
+            registration:
+              client-id: "messaging-client"
+              client-secret: "{noop}secret"
+              client-authentication-methods:
+                - "client_secret_basic"
+              authorization-grant-types:
+                - "authorization_code"
+                - "refresh_token"
+                - "client_credentials"
+              redirect-uris:
+                - "http://127.0.0.1:8080/login/oauth2/code/messaging-client-oidc"
+                - "http://127.0.0.1:8080/authorized"
+                - "https://www.baidu.com"
+              post-logout-redirect-uris:
+                - "http://127.0.0.1:8080/logged-out"
+              scopes:
+                - "openid"
+                - "profile"
+                - "message.read"
+                - "message.write"
+            require-authorization-consent: true
+  profiles:
+    active: dev
+
+查看org.springframework.boot.autoconfigure.security.oauth2.server.servlet.OAuth2AuthorizationServerWebSecurityConfiguration中有一段代码如下：
+        // 配置默认的设置，忽略认证端点的csrf校验
+        OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http);
+配置OAuth 2.0 Authorization Server 的支持
+所以我们看OAuth2AuthorizationServerConfiguration#applyDefaultSecurity()方法,
+
+	public static void applyDefaultSecurity(HttpSecurity http) throws Exception {
+	    //OAuth 2.0 Authorization Server最重要的Configurer
+		OAuth2AuthorizationServerConfigurer authorizationServerConfigurer =
+				new OAuth2AuthorizationServerConfigurer();
+		RequestMatcher endpointsMatcher = authorizationServerConfigurer
+				.getEndpointsMatcher();
+
+		http
+		    //配置端点请求匹配器，即匹配成功的话都会通过OAuth2AuthorizationServerConfigurer构建的过滤器
+			.securityMatcher(endpointsMatcher)
+			.authorizeHttpRequests(authorize ->
+				authorize.anyRequest().authenticated()
+			)
+			.csrf(csrf -> csrf.ignoringRequestMatchers(endpointsMatcher))
+			.apply(authorizationServerConfigurer);
+	}
+
+OAuth2AuthorizationServerConfigurer
+OAuth2AuthorizationServerConfigurer提供完全自定义 OAuth2 授权服务器安全配置的功能,它允许您指定要使用的核心组件 - 例如RegisteredClientRepository等 。它还允许您自定义协议端点的请求处理逻辑 - 例如，授权端点、设备授权端点、设备验证端点、令牌端点、令牌自检端点OAuth2AuthorizationService等。
+
+请求:http://127.0.0.1:8080/oauth2/authorize?client_id=messaging-client&response_type=code&scope=message.read&redirect_uri=https://www.baidu.com
+通过OAuth2AuthorizationEndpointFilter过滤器进行处理，处理过程如下：
+1、判断是否匹配该请求，默认为，默认匹配uri为/oauth2/authorize,方法为GET或者POST等等还有其他条件
+2、匹配成功的话，将请求转换为相应的Authentication,默认为OAuth2AuthorizationCodeRequestAuthenticationToken，默认采用DelegatingAuthenticationConverter委托类，里面包含了OAuth2AuthorizationCodeRequestAuthenticationConverter和OAuth2AuthorizationConsentAuthenticationConverter转换后的Authentication如图1722505646838.png
+3、进行认证管理器进行认证，默认最终通过OAuth2AuthorizationCodeRequestAuthenticationProvider进行认证，由于是匿名，所以会认证失败
+4、认证失败后，会进行到下一个过滤器。最终通过异常过滤器，将请求重定向到login登录页面
+5、重定向到登录页面，我们在浏览器页面输入账号密码后进行第二次经过OAuth2AuthorizationEndpointFilter过滤器。此时因为存在账号和密码，会认证通过，最终会调用OAuth2AuthorizationEndpointFilter#sendAuthorizationConsent()方法,并重定向到页面如图1722496440753.png
+6、当我们选中message.read并点击Submit Consent,此时会第三次进入到OAuth2AuthorizationEndpointFilter,此时进过验证后的Authentication为OAuth2AuthorizationCodeRequestAuthenticationToken，最终通过AuthenticationSuccessHandler进行重定向并携带有code
+
+
+OAuth2TokenEndpointFilter,OAuth2AuthorizationCodeAuthenticationProvider
