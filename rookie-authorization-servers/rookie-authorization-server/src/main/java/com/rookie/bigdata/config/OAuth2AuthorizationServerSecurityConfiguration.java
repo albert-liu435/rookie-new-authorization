@@ -131,7 +131,7 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
     @Bean
     public UserDetailsService userDetailsService() {
         UserDetails userDetails = User.withDefaultPasswordEncoder()
-                .username("user")
+                .username("user1")
                 .password("password")
                 .roles("admin", "normal", "unAuthentication")
                 .authorities("app", "web", "/test2", "/test3")
