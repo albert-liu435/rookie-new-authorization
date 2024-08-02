@@ -1,0 +1,289 @@
+默认相关的类：
+org.springframework.boot.autoconfigure.security.oauth2.server.servlet.OAuth2AuthorizationServerWebSecurityConfiguration
+org.springframework.boot.autoconfigure.security.oauth2.server.servlet.OAuth2AuthorizationServerAutoConfiguration
+org.springframework.boot.autoconfigure.security.oauth2.server.servlet.OAuth2AuthorizationServerConfiguration
+org.springframework.boot.autoconfigure.security.oauth2.server.servlet.OAuth2AuthorizationServerJwtAutoConfiguration
+org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerJwtConfiguration
+org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerOpaqueTokenConfiguration
+
+
+spring-boot-autoconfigure
+org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2ClientAutoConfiguration
+org.springframework.boot.autoconfigure.security.oauth2.client.reactive.ReactiveOAuth2ClientAutoConfiguration
+org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration
+org.springframework.boot.autoconfigure.security.oauth2.resource.reactive.ReactiveOAuth2ResourceServerAutoConfiguration
+org.springframework.boot.autoconfigure.security.oauth2.server.servlet.OAuth2AuthorizationServerAutoConfiguration
+org.springframework.boot.autoconfigure.security.oauth2.server.servlet.OAuth2AuthorizationServerJwtAutoConfiguration
+
+
+
+在yml文件中配置如下：
+配置授权服务器的用户名和密码，配置客户端的客户端ID,客户端密钥，客户端的认证方式为请求头的认证,配置资源服务器使用该客户端获取授权时支持的方式,授权码模式回调地址，oauth2.1已改为精准匹配，不能只设置域名，并且屏蔽了localhost，本机使用127.0.0.1访问, 该客户端的授权范围，OPENID与PROFILE是IdToken的scope，获取授权时请求OPENID的scope时认证服务会返回IdToken,客户端设置，require-authorization-consent设置用户需要确认授权
+
+server:
+  port: 8080
+
+spring:
+  security:
+    user:
+      name: user1
+      password: password
+    oauth2:
+      authorizationserver:
+        client:
+          messaging-client:
+            registration:
+              client-id: "messaging-client"
+              client-secret: "{noop}secret"
+              client-authentication-methods:
+                - "client_secret_basic"
+              authorization-grant-types:
+                - "authorization_code"
+                - "refresh_token"
+                - "client_credentials"
+              redirect-uris:
+                - "http://127.0.0.1:8080/login/oauth2/code/messaging-client-oidc"
+                - "http://127.0.0.1:8080/authorized"
+                - "https://www.baidu.com"
+              post-logout-redirect-uris:
+                - "http://127.0.0.1:8080/logged-out"
+              scopes:
+                - "openid"
+                - "profile"
+                - "message.read"
+                - "message.write"
+            require-authorization-consent: true
+  profiles:
+    active: dev
+
+配置好以后首先执行如下代码
+@Configuration(proxyBeanMethods = false)
+@EnableConfigurationProperties(OAuth2AuthorizationServerProperties.class)
+class OAuth2AuthorizationServerConfiguration {
+
+	private final OAuth2AuthorizationServerPropertiesMapper propertiesMapper;
+
+	OAuth2AuthorizationServerConfiguration(OAuth2AuthorizationServerProperties properties) {
+		this.propertiesMapper = new OAuth2AuthorizationServerPropertiesMapper(properties);
+	}
+
+	@Bean
+	@ConditionalOnMissingBean
+	@Conditional(RegisteredClientsConfiguredCondition.class)
+	RegisteredClientRepository registeredClientRepository() {
+		return new InMemoryRegisteredClientRepository(this.propertiesMapper.asRegisteredClients());
+	}
+
+	@Bean
+	@ConditionalOnMissingBean
+	AuthorizationServerSettings authorizationServerSettings() {
+		return this.propertiesMapper.asAuthorizationServerSettings();
+	}
+
+}
+
+实例化InMemoryRegisteredClientRepository，用于在内存中存储RegisteredClient,即加载yml文件中的配置为RegisteredClient并加载到内存中，用于在进行客户端进行授权时进行匹配使用
+实例化AuthorizationServerSettings,用于授权服务器配置设置的工具类,里面为一个map结构，存放了一些对应关系，如图1722492548545.png
+
+接下来会配置授权服务
+@Configuration(proxyBeanMethods = false)
+@ConditionalOnDefaultWebSecurity
+@ConditionalOnBean({ RegisteredClientRepository.class, AuthorizationServerSettings.class })
+class OAuth2AuthorizationServerWebSecurityConfiguration {
+
+
+    /**
+     * 配置端点的过滤器链
+     *
+     * @param http spring security核心配置类
+     * @return 过滤器链
+     * @throws Exception 抛出
+     */
+	@Bean
+	@Order(Ordered.HIGHEST_PRECEDENCE)
+	SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http) throws Exception {
+	    // 配置默认的设置，忽略认证端点的csrf校验
+		OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http);
+		// 开启OpenID Connect 1.0协议相关端点
+		http.getConfigurer(OAuth2AuthorizationServerConfigurer.class).oidc(withDefaults());
+		// 处理使用access token访问用户信息端点和客户端注册端点
+		http.oauth2ResourceServer((resourceServer) -> resourceServer.jwt(withDefaults()));
+		// 当未登录时访问认证端点时重定向至login页面
+		http.exceptionHandling((exceptions) -> exceptions.defaultAuthenticationEntryPointFor(
+				new LoginUrlAuthenticationEntryPoint("/login"), createRequestMatcher()));
+		return http.build();
+	}
+
+    /**
+     * 配置认证相关的过滤器链
+     *
+     * @param http spring security核心配置类
+     * @return 过滤器链
+     * @throws Exception 抛出
+     */
+	@Bean
+	@Order(SecurityProperties.BASIC_AUTH_ORDER)
+	SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
+		http.authorizeHttpRequests((authorize) -> authorize.anyRequest().authenticated()).formLogin(withDefaults());
+		return http.build();
+	}
+
+	private static RequestMatcher createRequestMatcher() {
+		MediaTypeRequestMatcher requestMatcher = new MediaTypeRequestMatcher(MediaType.TEXT_HTML);
+		requestMatcher.setIgnoredMediaTypes(Set.of(MediaType.ALL));
+		return requestMatcher;
+	}
+
+}
+
+
+
+
+
+
+
+用于实例化JwtDecoder和JWKSource,采用RSA的方式进行token加密与解密
+
+@AutoConfiguration(after = UserDetailsServiceAutoConfiguration.class)
+@ConditionalOnClass(OAuth2Authorization.class)
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
+public class OAuth2AuthorizationServerJwtAutoConfiguration {
+
+	@Bean
+	@ConditionalOnClass(JwtDecoder.class)
+	@ConditionalOnMissingBean
+	JwtDecoder jwtDecoder(JWKSource<SecurityContext> jwkSource) {
+		return OAuth2AuthorizationServerConfiguration.jwtDecoder(jwkSource);
+	}
+
+	@Bean
+	@Role(BeanDefinition.ROLE_INFRASTRUCTURE)
+	@ConditionalOnMissingBean
+	JWKSource<SecurityContext> jwkSource() {
+		RSAKey rsaKey = getRsaKey();
+		JWKSet jwkSet = new JWKSet(rsaKey);
+		return new ImmutableJWKSet<>(jwkSet);
+	}
+
+	private static RSAKey getRsaKey() {
+		KeyPair keyPair = generateRsaKey();
+		RSAPublicKey publicKey = (RSAPublicKey) keyPair.getPublic();
+		RSAPrivateKey privateKey = (RSAPrivateKey) keyPair.getPrivate();
+		RSAKey rsaKey = new RSAKey.Builder(publicKey).privateKey(privateKey)
+			.keyID(UUID.randomUUID().toString())
+			.build();
+		return rsaKey;
+	}
+
+	private static KeyPair generateRsaKey() {
+		KeyPair keyPair;
+		try {
+			KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
+			keyPairGenerator.initialize(2048);
+			keyPair = keyPairGenerator.generateKeyPair();
+		}
+		catch (Exception ex) {
+			throw new IllegalStateException(ex);
+		}
+		return keyPair;
+	}
+
+}
+
+
+在浏览器中输入：http://127.0.0.1:9000/oauth2/authorize?client_id=messaging-client&response_type=code&scope=message.read&redirect_uri=https://www.baidu.com
+经过的过滤器如下：
+Security filter chain: [
+  DisableEncodeUrlFilter
+  WebAsyncManagerIntegrationFilter
+  SecurityContextHolderFilter
+  AuthorizationServerContextFilter
+  HeaderWriterFilter
+  CorsFilter
+  CsrfFilter
+  OidcLogoutEndpointFilter
+  LogoutFilter
+  OAuth2AuthorizationServerMetadataEndpointFilter
+  OAuth2AuthorizationEndpointFilter
+  OAuth2DeviceVerificationEndpointFilter
+  OidcProviderConfigurationEndpointFilter
+  NimbusJwkSetEndpointFilter
+  OAuth2ClientAuthenticationFilter
+  BearerTokenAuthenticationFilter
+  RequestCacheAwareFilter
+  SecurityContextHolderAwareRequestFilter
+  AnonymousAuthenticationFilter
+  ExceptionTranslationFilter
+  AuthorizationFilter
+  OAuth2TokenEndpointFilter
+  OAuth2TokenIntrospectionEndpointFilter
+  OAuth2TokenRevocationEndpointFilter
+  OAuth2DeviceAuthorizationEndpointFilter
+  OidcUserInfoEndpointFilter
+]
+主要有OAuth2AuthorizationEndpointFilter过滤器进行处理
+
+最终会出现异常然后重定向到login页面,输入账号和密码，进行提交，账号密码验证通过后，会重定向到http://127.0.0.1:9000/oauth2/authorize?client_id=messaging-client&response_type=code&scope=message.read&redirect_uri=https://www.baidu.com&continue,重定向的时候经过的过滤器如下：
+Security filter chain: [
+  DisableEncodeUrlFilter
+  WebAsyncManagerIntegrationFilter
+  SecurityContextHolderFilter
+  AuthorizationServerContextFilter
+  HeaderWriterFilter
+  CorsFilter
+  CsrfFilter
+  OidcLogoutEndpointFilter
+  LogoutFilter
+  OAuth2AuthorizationServerMetadataEndpointFilter
+  OAuth2AuthorizationEndpointFilter
+  OAuth2DeviceVerificationEndpointFilter
+  OidcProviderConfigurationEndpointFilter
+  NimbusJwkSetEndpointFilter
+  OAuth2ClientAuthenticationFilter
+  BearerTokenAuthenticationFilter
+  RequestCacheAwareFilter
+  SecurityContextHolderAwareRequestFilter
+  AnonymousAuthenticationFilter
+  ExceptionTranslationFilter
+  AuthorizationFilter
+  OAuth2TokenEndpointFilter
+  OAuth2TokenIntrospectionEndpointFilter
+  OAuth2TokenRevocationEndpointFilter
+  OAuth2DeviceAuthorizationEndpointFilter
+  OidcUserInfoEndpointFilter
+]
+
+重要的是经过过：OAuth2AuthorizationCodeRequestAuthenticationConverter
+
+最终展示图片如下：1722496440753.png
+提交submit consent之后，会生成一个code,
+经过过滤器如下：
+Security filter chain: [
+  DisableEncodeUrlFilter
+  WebAsyncManagerIntegrationFilter
+  SecurityContextHolderFilter
+  AuthorizationServerContextFilter
+  HeaderWriterFilter
+  CorsFilter
+  CsrfFilter
+  OidcLogoutEndpointFilter
+  LogoutFilter
+  OAuth2AuthorizationServerMetadataEndpointFilter
+  OAuth2AuthorizationEndpointFilter
+  OAuth2DeviceVerificationEndpointFilter
+  OidcProviderConfigurationEndpointFilter
+  NimbusJwkSetEndpointFilter
+  OAuth2ClientAuthenticationFilter
+  BearerTokenAuthenticationFilter
+  RequestCacheAwareFilter
+  SecurityContextHolderAwareRequestFilter
+  AnonymousAuthenticationFilter
+  ExceptionTranslationFilter
+  AuthorizationFilter
+  OAuth2TokenEndpointFilter
+  OAuth2TokenIntrospectionEndpointFilter
+  OAuth2TokenRevocationEndpointFilter
+  OAuth2DeviceAuthorizationEndpointFilter
+  OidcUserInfoEndpointFilter
+]
+如该url:https://www.baidu.com/?code=kImQE1nAUm94_MARzykG59yH2yyaMQAmmcLuo95WzjFMG64rjSbwstzzBLYbCVRfFUfD5q7i5xL9CGDmIJT3An-2jjttKMq4Rd3YlhmqWh4eg4fTHXCR5kJa4cuU-neW
