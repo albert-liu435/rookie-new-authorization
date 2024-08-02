@@ -41,13 +41,10 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 
-import java.io.IOException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
-import java.security.NoSuchAlgorithmException;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
-import java.security.spec.InvalidKeySpecException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -56,12 +53,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-import static org.springframework.security.config.Customizer.withDefaults;
 
 /**
- * @Class OAuth2AuthorizationServerSecurityConfiguration
+ * @Class AuthorizationConfig
  * @Description 认证配置
- * <p>
  * {@link EnableMethodSecurity} 开启全局方法认证，启用JSR250注解支持，启用注解 {@link Secured} 支持，
  * 在Spring Security 6.0版本中将@Configuration注解从@EnableWebSecurity, @EnableMethodSecurity, @EnableGlobalMethodSecurity
  * 和 @EnableGlobalAuthentication 中移除，使用这些注解需手动添加 @Configuration 注解
@@ -69,67 +64,57 @@ import static org.springframework.security.config.Customizer.withDefaults;
  * 1. 加载了WebSecurityConfiguration配置类, 配置安全认证策略。
  * 2. 加载了AuthenticationConfiguration, 配置了认证信息。
  * @Author rookie
- * @Date 2024/8/1 14:15
+ * @Date 2024/3/26 9:43
  * @Version 1.0
  */
 @Configuration
 @EnableWebSecurity(debug = true)
+//@EnableWebSecurity()
 @EnableMethodSecurity(jsr250Enabled = true, securedEnabled = true)
 public class OAuth2AuthorizationServerSecurityConfiguration {
 
-    /**
-     * 自定义consentPage页面uri地址
-     */
     private static final String CUSTOM_CONSENT_PAGE_URI = "/oauth2/consent";
 
-
     /**
-     * 配置端点的过滤器
+     * 配置端点的过滤器链
      *
      * @param http spring security核心配置类
-     * @return SecurityFilterChain 过滤器链
-     * @throws Exception 抛出异常
+     * @return 过滤器链
+     * @throws Exception 抛出
      */
     @Bean
-//    @Order(Ordered.HIGHEST_PRECEDENCE)
     public SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http) throws Exception {
-
         // 配置默认的设置，忽略认证端点的csrf校验
         OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http);
 
-        http
-                .getConfigurer(OAuth2AuthorizationServerConfigurer.class)
+        http.getConfigurer(OAuth2AuthorizationServerConfigurer.class)
                 // 开启OpenID Connect 1.0协议相关端点
-                .oidc(withDefaults())
+                .oidc(Customizer.withDefaults())
                 // 设置自定义用户确认授权页
-                .authorizationEndpoint(authorizationEndpoint -> authorizationEndpoint
-                        .consentPage(CUSTOM_CONSENT_PAGE_URI));
-
+                .authorizationEndpoint(authorizationEndpoint -> authorizationEndpoint.consentPage(CUSTOM_CONSENT_PAGE_URI));
         http
                 // 当未登录时访问认证端点时重定向至login页面
-                .exceptionHandling(exceptions -> exceptions
+                .exceptionHandling((exceptions) -> exceptions
                         .defaultAuthenticationEntryPointFor(
                                 new LoginUrlAuthenticationEntryPoint("/login"),
                                 new MediaTypeRequestMatcher(MediaType.TEXT_HTML)
-                        ))
-
+                        )
+                )
                 // 处理使用access token访问用户信息端点和客户端注册端点
-                .oauth2ResourceServer(
-                        (resourceServer) -> resourceServer
-                                .jwt(withDefaults())
-                );
+                .oauth2ResourceServer((resourceServer) -> resourceServer
+                        .jwt(Customizer.withDefaults()));
+
         return http.build();
     }
 
     /**
-     * 配置认证相关的过滤器
+     * 配置认证相关的过滤器链
      *
      * @param http spring security核心配置类
-     * @return SecurityFilterChain 过滤器链
-     * @throws Exception 抛出异常
+     * @return 过滤器链
+     * @throws Exception 抛出
      */
     @Bean
-//    @Order(SecurityProperties.BASIC_AUTH_ORDER)
     public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
         http.authorizeHttpRequests((authorize) -> authorize
                         // 放行静态资源
@@ -137,14 +122,17 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
                         .anyRequest().authenticated()
                 )
                 // 指定登录页面,
-                .formLogin(formLogin -> formLogin
-                        .loginPage("/login"));
+                .formLogin(formLogin ->
+                        formLogin.loginPage("/login")
+                );
+
         // 指定登录页面,因为默认为/login，所以这里应该也可以写成
-        //.formLogin(Customizer.withDefaults());
+//                .formLogin(Customizer.withDefaults());
 
         // 添加BearerTokenAuthenticationFilter，将认证服务当做一个资源服务，解析请求头中的token
         http.oauth2ResourceServer((resourceServer) -> resourceServer
-                .jwt(withDefaults()));
+                .jwt(Customizer.withDefaults()));
+
         return http.build();
     }
 
@@ -158,7 +146,6 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
         return new BCryptPasswordEncoder();
     }
 
-
     /**
      * 配置客户端Repository
      *
@@ -169,13 +156,13 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
     @Bean
     public RegisteredClientRepository registeredClientRepository(JdbcTemplate jdbcTemplate, PasswordEncoder passwordEncoder) {
         RegisteredClient registeredClient = RegisteredClient.withId(UUID.randomUUID().toString())
-                //客户端
-                .clientId("message-client")
-                //客户端密钥,使用密码解析器加密
+                // 客户端id
+                .clientId("messaging-client")
+                // 客户端秘钥，使用密码解析器加密
                 .clientSecret(passwordEncoder.encode("123456"))
-                //客户端认证方式,基于请求头的认证
+                // 客户端认证方式，基于请求头的认证
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
-                //配置资源服务器使用该客户端获取授权时支持的方式
+                // 配置资源服务器使用该客户端获取授权时支持的方式
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
                 .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
@@ -192,11 +179,13 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
                 .clientSettings(ClientSettings.builder().requireAuthorizationConsent(true).build())
                 //有效期设置为12年，如果不设置的话，默认为当前时间，则马上回过期不能使用
                 .clientSecretExpiresAt(Instant.now().plus(12 * 365, ChronoUnit.DAYS))
-                //设置2天有效期
+//                //设置2天有效期
                 .tokenSettings(TokenSettings.builder().authorizationCodeTimeToLive(Duration.ofDays(2)).accessTokenTimeToLive(Duration.ofDays(2)).build())
                 .build();
+
         // 基于db存储客户端，还有一个基于内存的实现 InMemoryRegisteredClientRepository
         JdbcRegisteredClientRepository registeredClientRepository = new JdbcRegisteredClientRepository(jdbcTemplate);
+
         // 初始化客户端
         RegisteredClient repositoryByClientId = registeredClientRepository.findByClientId(registeredClient.getClientId());
         if (repositoryByClientId == null) {
@@ -221,7 +210,6 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
             registeredClientRepository.save(deviceClient);
         }
         return registeredClientRepository;
-
     }
 
     /**
@@ -229,7 +217,7 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
      *
      * @param jdbcTemplate               db数据源信息
      * @param registeredClientRepository 上边注入的客户端repository
-     * @return OAuth2AuthorizationService
+     * @return JdbcOAuth2AuthorizationService
      */
     @Bean
     public OAuth2AuthorizationService authorizationService(JdbcTemplate jdbcTemplate, RegisteredClientRepository registeredClientRepository) {
@@ -250,19 +238,16 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
         return new JdbcOAuth2AuthorizationConsentService(jdbcTemplate, registeredClientRepository);
     }
 
-
     /**
      * 配置jwk源，使用非对称加密，公开用于检索匹配指定选择器的JWK的方法
      *
      * @return JWKSource
      */
     @Bean
-    public JWKSource<SecurityContext> jwkSource() throws IOException, NoSuchAlgorithmException, InvalidKeySpecException {
+    public JWKSource<SecurityContext> jwkSource() {
         KeyPair keyPair = generateRsaKey();
         RSAPublicKey publicKey = (RSAPublicKey) keyPair.getPublic();
         RSAPrivateKey privateKey = (RSAPrivateKey) keyPair.getPrivate();
-//        RSAPrivateKey privateKey = KeyUtils.getRSAPrivateKey("pkcs/app.key");
-//        RSAPublicKey publicKey = KeyUtils.getRSAPublicKey("pkcs/app.pub");
         RSAKey rsaKey = new RSAKey.Builder(publicKey)
                 .privateKey(privateKey)
                 .keyID(UUID.randomUUID().toString())
