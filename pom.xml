@@ -18,7 +18,7 @@
 
 
     <modules>
-        <module>rookie-authorization-security</module>
+<!--        <module>rookie-authorization-security</module>-->
         <module>rookie-authorization-servers</module>
 <!--        <module>rookie-authorization-gateway</module>-->
     </modules>
@@ -28,8 +28,8 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
 
-        <spring.boot.version>3.1.0</spring.boot.version>
-
+<!--        <spring.boot.version>3.1.0</spring.boot.version>-->
+        <spring.boot.version>3.3.1</spring.boot.version>
         <mybatisplus.version>3.5.3.1</mybatisplus.version>
 
         <hutool.version>5.7.9</hutool.version>

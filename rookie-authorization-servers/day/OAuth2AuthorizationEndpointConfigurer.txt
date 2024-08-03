@@ -1,0 +1,2 @@
+OAuth2AuthorizationEndpointConfigurer
+OAuth2AuthorizationEndpointConfigurer用来配置授权端点，即用来配置OAuth2AuthorizationEndpointFilter过滤器，默认用来处理uri为/oauth2/authorize的请求

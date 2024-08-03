@@ -1,0 +1,305 @@
+OAuth2AuthorizationServerConfigurer
+OAuth2AuthorizationServerConfigurer提供完全自定义 OAuth2 授权服务器安全配置的功能,它允许您指定要使用的核心组件 - 例如RegisteredClientRepository等 。它还允许您自定义协议端点的请求处理逻辑 - 例如，授权端点、设备授权端点、设备验证端点、令牌端点、令牌自检端点OAuth2AuthorizationService等
+
+public final class OAuth2AuthorizationServerConfigurer
+		extends AbstractHttpConfigurer<OAuth2AuthorizationServerConfigurer, HttpSecurity> {
+
+	private final Map<Class<? extends AbstractOAuth2Configurer>, AbstractOAuth2Configurer> configurers = createConfigurers();
+	private RequestMatcher endpointsMatcher;
+
+
+	/**
+	 * 设置注册的RegisteredClientRepository
+	 */
+	public OAuth2AuthorizationServerConfigurer registeredClientRepository(RegisteredClientRepository registeredClientRepository) {
+		Assert.notNull(registeredClientRepository, "registeredClientRepository cannot be null");
+		getBuilder().setSharedObject(RegisteredClientRepository.class, registeredClientRepository);
+		return this;
+	}
+
+	/**
+	 * 设置OAuth2AuthorizationService
+	 */
+	public OAuth2AuthorizationServerConfigurer authorizationService(OAuth2AuthorizationService authorizationService) {
+		Assert.notNull(authorizationService, "authorizationService cannot be null");
+		getBuilder().setSharedObject(OAuth2AuthorizationService.class, authorizationService);
+		return this;
+	}
+
+	/**
+	 * 设置OAuth2AuthorizationConsentService
+	 */
+	public OAuth2AuthorizationServerConfigurer authorizationConsentService(OAuth2AuthorizationConsentService authorizationConsentService) {
+		Assert.notNull(authorizationConsentService, "authorizationConsentService cannot be null");
+		getBuilder().setSharedObject(OAuth2AuthorizationConsentService.class, authorizationConsentService);
+		return this;
+	}
+
+	/**
+	 * 设置AuthorizationServerSettings
+	 */
+	public OAuth2AuthorizationServerConfigurer authorizationServerSettings(AuthorizationServerSettings authorizationServerSettings) {
+		Assert.notNull(authorizationServerSettings, "authorizationServerSettings cannot be null");
+		getBuilder().setSharedObject(AuthorizationServerSettings.class, authorizationServerSettings);
+		return this;
+	}
+
+	/**
+	 * 设置OAuth2TokenGenerator用于生成token
+	 */
+	public OAuth2AuthorizationServerConfigurer tokenGenerator(OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator) {
+		Assert.notNull(tokenGenerator, "tokenGenerator cannot be null");
+		getBuilder().setSharedObject(OAuth2TokenGenerator.class, tokenGenerator);
+		return this;
+	}
+
+	/**
+	 * 配置OAuth2ClientAuthenticationConfigurer
+	 */
+	public OAuth2AuthorizationServerConfigurer clientAuthentication(Customizer<OAuth2ClientAuthenticationConfigurer> clientAuthenticationCustomizer) {
+		clientAuthenticationCustomizer.customize(getConfigurer(OAuth2ClientAuthenticationConfigurer.class));
+		return this;
+	}
+
+	/**
+	 * 配置OAuth2AuthorizationServerMetadataEndpointConfigurer
+	 */
+	public OAuth2AuthorizationServerConfigurer authorizationServerMetadataEndpoint(Customizer<OAuth2AuthorizationServerMetadataEndpointConfigurer> authorizationServerMetadataEndpointCustomizer) {
+		authorizationServerMetadataEndpointCustomizer.customize(getConfigurer(OAuth2AuthorizationServerMetadataEndpointConfigurer.class));
+		return this;
+	}
+
+	/**
+	 * 配置OAuth2AuthorizationEndpointConfigurer
+	 */
+	public OAuth2AuthorizationServerConfigurer authorizationEndpoint(Customizer<OAuth2AuthorizationEndpointConfigurer> authorizationEndpointCustomizer) {
+		authorizationEndpointCustomizer.customize(getConfigurer(OAuth2AuthorizationEndpointConfigurer.class));
+		return this;
+	}
+
+	/**
+	 * 配置OAuth2TokenEndpointConfigurer
+	 */
+	public OAuth2AuthorizationServerConfigurer tokenEndpoint(Customizer<OAuth2TokenEndpointConfigurer> tokenEndpointCustomizer) {
+		tokenEndpointCustomizer.customize(getConfigurer(OAuth2TokenEndpointConfigurer.class));
+		return this;
+	}
+
+	/**
+	 * 配置OAuth2TokenIntrospectionEndpointConfigurer
+	 */
+	public OAuth2AuthorizationServerConfigurer tokenIntrospectionEndpoint(Customizer<OAuth2TokenIntrospectionEndpointConfigurer> tokenIntrospectionEndpointCustomizer) {
+		tokenIntrospectionEndpointCustomizer.customize(getConfigurer(OAuth2TokenIntrospectionEndpointConfigurer.class));
+		return this;
+	}
+
+	/**
+	 * 配置OAuth2TokenRevocationEndpointConfigurer
+	 */
+	public OAuth2AuthorizationServerConfigurer tokenRevocationEndpoint(Customizer<OAuth2TokenRevocationEndpointConfigurer> tokenRevocationEndpointCustomizer) {
+		tokenRevocationEndpointCustomizer.customize(getConfigurer(OAuth2TokenRevocationEndpointConfigurer.class));
+		return this;
+	}
+
+	/**
+	 *配置OAuth2DeviceAuthorizationEndpointConfigurer
+	 */
+	public OAuth2AuthorizationServerConfigurer deviceAuthorizationEndpoint(Customizer<OAuth2DeviceAuthorizationEndpointConfigurer> deviceAuthorizationEndpointCustomizer) {
+		deviceAuthorizationEndpointCustomizer.customize(getConfigurer(OAuth2DeviceAuthorizationEndpointConfigurer.class));
+		return this;
+	}
+
+	/**
+	 * 配置OAuth2DeviceVerificationEndpointConfigurer
+	 */
+	public OAuth2AuthorizationServerConfigurer deviceVerificationEndpoint(Customizer<OAuth2DeviceVerificationEndpointConfigurer> deviceVerificationEndpointCustomizer) {
+		deviceVerificationEndpointCustomizer.customize(getConfigurer(OAuth2DeviceVerificationEndpointConfigurer.class));
+		return this;
+	}
+
+	/**
+	 * 配置OidcConfigurer
+	 */
+	public OAuth2AuthorizationServerConfigurer oidc(Customizer<OidcConfigurer> oidcCustomizer) {
+		OidcConfigurer oidcConfigurer = getConfigurer(OidcConfigurer.class);
+		if (oidcConfigurer == null) {
+			addConfigurer(OidcConfigurer.class, new OidcConfigurer(this::postProcess));
+			oidcConfigurer = getConfigurer(OidcConfigurer.class);
+		}
+		oidcCustomizer.customize(oidcConfigurer);
+		return this;
+	}
+
+	/**
+	 *
+	 */
+	public RequestMatcher getEndpointsMatcher() {
+		// Return a deferred RequestMatcher
+		// since endpointsMatcher is constructed in init(HttpSecurity).
+		return (request) -> this.endpointsMatcher.matches(request);
+	}
+    /**
+    *初始化操作
+    */
+	@Override
+	public void init(HttpSecurity httpSecurity) {
+	    //从容器中获取AuthorizationServerSettings
+		AuthorizationServerSettings authorizationServerSettings = OAuth2ConfigurerUtils.getAuthorizationServerSettings(httpSecurity);
+		//对AuthorizationServerSettings进行校验
+		validateAuthorizationServerSettings(authorizationServerSettings);
+        //是否配置OpenID Connect 1.0
+		if (isOidcEnabled()) {
+			// Add OpenID Connect session tracking capabilities.
+			//添加OpenID Connect session的追踪能力
+			initSessionRegistry(httpSecurity);
+			SessionRegistry sessionRegistry = httpSecurity.getSharedObject(SessionRegistry.class);
+			OAuth2AuthorizationEndpointConfigurer authorizationEndpointConfigurer =
+					getConfigurer(OAuth2AuthorizationEndpointConfigurer.class);
+			authorizationEndpointConfigurer.setSessionAuthenticationStrategy((authentication, request, response) -> {
+				if (authentication instanceof OAuth2AuthorizationCodeRequestAuthenticationToken authorizationCodeRequestAuthentication) {
+					if (authorizationCodeRequestAuthentication.getScopes().contains(OidcScopes.OPENID)) {
+						if (sessionRegistry.getSessionInformation(request.getSession().getId()) == null) {
+							sessionRegistry.registerNewSession(
+									request.getSession().getId(),
+									((Authentication) authorizationCodeRequestAuthentication.getPrincipal()).getPrincipal());
+						}
+					}
+				}
+			});
+		} else {
+			// OpenID Connect is disabled.
+			// Add an authentication validator that rejects authentication requests.
+			OAuth2AuthorizationEndpointConfigurer authorizationEndpointConfigurer =
+					getConfigurer(OAuth2AuthorizationEndpointConfigurer.class);
+			authorizationEndpointConfigurer.addAuthorizationCodeRequestAuthenticationValidator((authenticationContext) -> {
+				OAuth2AuthorizationCodeRequestAuthenticationToken authorizationCodeRequestAuthentication =
+						authenticationContext.getAuthentication();
+				if (authorizationCodeRequestAuthentication.getScopes().contains(OidcScopes.OPENID)) {
+					OAuth2Error error = new OAuth2Error(OAuth2ErrorCodes.INVALID_SCOPE,
+							"OpenID Connect 1.0 authentication requests are restricted.",
+							"https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.2.1");
+					throw new OAuth2AuthorizationCodeRequestAuthenticationException(
+							error, authorizationCodeRequestAuthentication);
+				}
+			});
+		}
+
+		List<RequestMatcher> requestMatchers = new ArrayList<>();
+		//对其他configurers进行初始化并设置RequestMatcher
+		this.configurers.values().forEach(configurer -> {
+			configurer.init(httpSecurity);
+			requestMatchers.add(configurer.getRequestMatcher());
+		});
+		requestMatchers.add(new AntPathRequestMatcher(
+				authorizationServerSettings.getJwkSetEndpoint(), HttpMethod.GET.name()));
+		this.endpointsMatcher = new OrRequestMatcher(requestMatchers);
+
+        //ExceptionHandlingConfigurer 异常配置
+		ExceptionHandlingConfigurer<HttpSecurity> exceptionHandling = httpSecurity.getConfigurer(ExceptionHandlingConfigurer.class);
+		if (exceptionHandling != null) {
+			exceptionHandling.defaultAuthenticationEntryPointFor(
+					new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED),
+					new OrRequestMatcher(
+							getRequestMatcher(OAuth2TokenEndpointConfigurer.class),
+							getRequestMatcher(OAuth2TokenIntrospectionEndpointConfigurer.class),
+							getRequestMatcher(OAuth2TokenRevocationEndpointConfigurer.class),
+							getRequestMatcher(OAuth2DeviceAuthorizationEndpointConfigurer.class))
+			);
+		}
+	}
+
+	@Override
+	public void configure(HttpSecurity httpSecurity) {
+	    //配置其他各个configurers
+		this.configurers.values().forEach(configurer -> configurer.configure(httpSecurity));
+
+		AuthorizationServerSettings authorizationServerSettings = OAuth2ConfigurerUtils.getAuthorizationServerSettings(httpSecurity);
+        //初始化AuthorizationServerContext安全上下文过滤器，用于处理AuthorizationServerContext上下文
+		AuthorizationServerContextFilter authorizationServerContextFilter = new AuthorizationServerContextFilter(authorizationServerSettings);
+		httpSecurity.addFilterAfter(postProcess(authorizationServerContextFilter), SecurityContextHolderFilter.class);
+        //jwkSource并设置到NimbusJwkSetEndpointFilter过滤器中，用于进行过加密验证
+		JWKSource<com.nimbusds.jose.proc.SecurityContext> jwkSource = OAuth2ConfigurerUtils.getJwkSource(httpSecurity);
+		if (jwkSource != null) {
+			NimbusJwkSetEndpointFilter jwkSetEndpointFilter = new NimbusJwkSetEndpointFilter(
+					jwkSource, authorizationServerSettings.getJwkSetEndpoint());
+			httpSecurity.addFilterBefore(postProcess(jwkSetEndpointFilter), AbstractPreAuthenticatedProcessingFilter.class);
+		}
+	}
+
+	private boolean isOidcEnabled() {
+		return getConfigurer(OidcConfigurer.class) != null;
+	}
+
+	private Map<Class<? extends AbstractOAuth2Configurer>, AbstractOAuth2Configurer> createConfigurers() {
+		Map<Class<? extends AbstractOAuth2Configurer>, AbstractOAuth2Configurer> configurers = new LinkedHashMap<>();
+		configurers.put(OAuth2ClientAuthenticationConfigurer.class, new OAuth2ClientAuthenticationConfigurer(this::postProcess));
+		configurers.put(OAuth2AuthorizationServerMetadataEndpointConfigurer.class, new OAuth2AuthorizationServerMetadataEndpointConfigurer(this::postProcess));
+		configurers.put(OAuth2AuthorizationEndpointConfigurer.class, new OAuth2AuthorizationEndpointConfigurer(this::postProcess));
+		configurers.put(OAuth2TokenEndpointConfigurer.class, new OAuth2TokenEndpointConfigurer(this::postProcess));
+		configurers.put(OAuth2TokenIntrospectionEndpointConfigurer.class, new OAuth2TokenIntrospectionEndpointConfigurer(this::postProcess));
+		configurers.put(OAuth2TokenRevocationEndpointConfigurer.class, new OAuth2TokenRevocationEndpointConfigurer(this::postProcess));
+		configurers.put(OAuth2DeviceAuthorizationEndpointConfigurer.class, new OAuth2DeviceAuthorizationEndpointConfigurer(this::postProcess));
+		configurers.put(OAuth2DeviceVerificationEndpointConfigurer.class, new OAuth2DeviceVerificationEndpointConfigurer(this::postProcess));
+		return configurers;
+	}
+
+	@SuppressWarnings("unchecked")
+	private <T> T getConfigurer(Class<T> type) {
+		return (T) this.configurers.get(type);
+	}
+
+	private <T extends AbstractOAuth2Configurer> void addConfigurer(Class<T> configurerType, T configurer) {
+		this.configurers.put(configurerType, configurer);
+	}
+
+	private <T extends AbstractOAuth2Configurer> RequestMatcher getRequestMatcher(Class<T> configurerType) {
+		T configurer = getConfigurer(configurerType);
+		return configurer != null ? configurer.getRequestMatcher() : null;
+	}
+
+	private static void validateAuthorizationServerSettings(AuthorizationServerSettings authorizationServerSettings) {
+		if (authorizationServerSettings.getIssuer() != null) {
+			URI issuerUri;
+			try {
+				issuerUri = new URI(authorizationServerSettings.getIssuer());
+				issuerUri.toURL();
+			} catch (Exception ex) {
+				throw new IllegalArgumentException("issuer must be a valid URL", ex);
+			}
+			// rfc8414 https://datatracker.ietf.org/doc/html/rfc8414#section-2
+			if (issuerUri.getQuery() != null || issuerUri.getFragment() != null) {
+				throw new IllegalArgumentException("issuer cannot contain query or fragment component");
+			}
+		}
+	}
+
+	private static void initSessionRegistry(HttpSecurity httpSecurity) {
+		SessionRegistry sessionRegistry = OAuth2ConfigurerUtils.getOptionalBean(httpSecurity, SessionRegistry.class);
+		if (sessionRegistry == null) {
+			sessionRegistry = new SessionRegistryImpl();
+			registerDelegateApplicationListener(httpSecurity, (SessionRegistryImpl) sessionRegistry);
+		}
+		httpSecurity.setSharedObject(SessionRegistry.class, sessionRegistry);
+	}
+
+	private static void registerDelegateApplicationListener(HttpSecurity httpSecurity, ApplicationListener<?> delegate) {
+		DelegatingApplicationListener delegatingApplicationListener =
+				OAuth2ConfigurerUtils.getOptionalBean(httpSecurity, DelegatingApplicationListener.class);
+		if (delegatingApplicationListener == null) {
+			return;
+		}
+		SmartApplicationListener smartListener = new GenericApplicationListenerAdapter(delegate);
+		delegatingApplicationListener.addListener(smartListener);
+	}
+
+}
+
+从源码中createConfigurers方法可以看到OAuth2AuthorizationServerConfigurer会配置如下的Configurer
+OAuth2ClientAuthenticationConfigurer:OAuth 2.0的客户端的认证配置
+OAuth2AuthorizationServerMetadataEndpointConfigurer:用于配置OAuth 2.0 认证服务元数据
+OAuth2AuthorizationEndpointConfigurer
+OAuth2TokenEndpointConfigurer
+OAuth2TokenIntrospectionEndpointConfigurer
+OAuth2TokenRevocationEndpointConfigurer
+OAuth2DeviceAuthorizationEndpointConfigurer
+OAuth2DeviceVerificationEndpointConfigurer
