@@ -1,0 +1,220 @@
+OAuth2AuthorizationEndpointFilter
+OAuth2AuthorizationEndpointFilter用于授权码模式（authorization code）过滤器,用来处理uri为/oauth2/authorize的请求。该Filter使用OAuth2AuthorizationEndpointConfigurer配置的
+
+OAuth2AuthorizationEndpointConfigurer用来配置授权端点，即用来配置OAuth2AuthorizationEndpointFilter过滤器，默认用来处理uri为/oauth2/authorize的请求
+
+public final class OAuth2AuthorizationEndpointConfigurer extends AbstractOAuth2Configurer {
+    //用于匹配HttpServletRequest
+	private RequestMatcher requestMatcher;
+	//
+	private final List<AuthenticationConverter> authorizationRequestConverters = new ArrayList<>();
+	private Consumer<List<AuthenticationConverter>> authorizationRequestConvertersConsumer = (authorizationRequestConverters) -> {};
+	private final List<AuthenticationProvider> authenticationProviders = new ArrayList<>();
+	private Consumer<List<AuthenticationProvider>> authenticationProvidersConsumer = (authenticationProviders) -> {};
+	private AuthenticationSuccessHandler authorizationResponseHandler;
+	private AuthenticationFailureHandler errorResponseHandler;
+	private String consentPage;
+	private Consumer<OAuth2AuthorizationCodeRequestAuthenticationContext> authorizationCodeRequestAuthenticationValidator;
+	private SessionAuthenticationStrategy sessionAuthenticationStrategy;
+
+	OAuth2AuthorizationEndpointConfigurer(ObjectPostProcessor<Object> objectPostProcessor) {
+		super(objectPostProcessor);
+	}
+
+	/**
+	 * 添加AuthenticationConverter到authorizationRequestConverters,用于转换HttpServletRequest为Authentication
+	 */
+	public OAuth2AuthorizationEndpointConfigurer authorizationRequestConverter(AuthenticationConverter authorizationRequestConverter) {
+		Assert.notNull(authorizationRequestConverter, "authorizationRequestConverter cannot be null");
+		this.authorizationRequestConverters.add(authorizationRequestConverter);
+		return this;
+	}
+
+	/**
+	 *
+	 */
+	public OAuth2AuthorizationEndpointConfigurer authorizationRequestConverters(
+			Consumer<List<AuthenticationConverter>> authorizationRequestConvertersConsumer) {
+		Assert.notNull(authorizationRequestConvertersConsumer, "authorizationRequestConvertersConsumer cannot be null");
+		this.authorizationRequestConvertersConsumer = authorizationRequestConvertersConsumer;
+		return this;
+	}
+
+	/**
+	 * 添加AuthenticationProvider到authenticationProviders,用于进行Authentication验证
+	 */
+	public OAuth2AuthorizationEndpointConfigurer authenticationProvider(AuthenticationProvider authenticationProvider) {
+		Assert.notNull(authenticationProvider, "authenticationProvider cannot be null");
+		this.authenticationProviders.add(authenticationProvider);
+		return this;
+	}
+
+	/**
+	 *
+	 */
+	public OAuth2AuthorizationEndpointConfigurer authenticationProviders(
+			Consumer<List<AuthenticationProvider>> authenticationProvidersConsumer) {
+		Assert.notNull(authenticationProvidersConsumer, "authenticationProvidersConsumer cannot be null");
+		this.authenticationProvidersConsumer = authenticationProvidersConsumer;
+		return this;
+	}
+
+	/**
+	 * 设置AuthenticationSuccessHandler，用于认证成功后处理OAuth2AuthorizationCodeRequestAuthenticationToken,
+	 */
+	public OAuth2AuthorizationEndpointConfigurer authorizationResponseHandler(AuthenticationSuccessHandler authorizationResponseHandler) {
+		this.authorizationResponseHandler = authorizationResponseHandler;
+		return this;
+	}
+
+	/**
+	 * 设置AuthenticationFailureHandler 用于处理OAuth2AuthenticationException异常
+	 */
+	public OAuth2AuthorizationEndpointConfigurer errorResponseHandler(AuthenticationFailureHandler errorResponseHandler) {
+		this.errorResponseHandler = errorResponseHandler;
+		return this;
+	}
+
+	/**
+	 * Specify the URI to redirect Resource Owners to if consent is required during
+	 * the {@code authorization_code} flow. A default consent page will be generated when
+	 * this attribute is not specified.
+	 *
+	 * If a URI is specified, applications are required to process the specified URI to generate
+	 * a consent page. The query string will contain the following parameters:
+	 *
+	 * <ul>
+	 * <li>{@code client_id} - the client identifier</li>
+	 * <li>{@code scope} - a space-delimited list of scopes present in the authorization request</li>
+	 * <li>{@code state} - a CSRF protection token</li>
+	 * </ul>
+	 *
+	 * In general, the consent page should create a form that submits
+	 * a request with the following requirements:
+	 *
+	 * <ul>
+	 * <li>It must be an HTTP POST</li>
+	 * <li>It must be submitted to {@link AuthorizationServerSettings#getAuthorizationEndpoint()}</li>
+	 * <li>It must include the received {@code client_id} as an HTTP parameter</li>
+	 * <li>It must include the received {@code state} as an HTTP parameter</li>
+	 * <li>It must include the list of {@code scope}s the {@code Resource Owner}
+	 * consented to as an HTTP parameter</li>
+	 * </ul>
+	 *
+	 * @param consentPage the URI of the custom consent page to redirect to if consent is required (e.g. "/oauth2/consent")
+	 * @return the {@link OAuth2AuthorizationEndpointConfigurer} for further configuration
+	 */
+	public OAuth2AuthorizationEndpointConfigurer consentPage(String consentPage) {
+		this.consentPage = consentPage;
+		return this;
+	}
+
+	void addAuthorizationCodeRequestAuthenticationValidator(
+			Consumer<OAuth2AuthorizationCodeRequestAuthenticationContext> authenticationValidator) {
+		this.authorizationCodeRequestAuthenticationValidator =
+				this.authorizationCodeRequestAuthenticationValidator == null ?
+						authenticationValidator :
+						this.authorizationCodeRequestAuthenticationValidator.andThen(authenticationValidator);
+	}
+
+	void setSessionAuthenticationStrategy(SessionAuthenticationStrategy sessionAuthenticationStrategy) {
+		this.sessionAuthenticationStrategy = sessionAuthenticationStrategy;
+	}
+
+	@Override
+	void init(HttpSecurity httpSecurity) {
+	    //从容器中获取AuthorizationServerSettings
+		AuthorizationServerSettings authorizationServerSettings = OAuth2ConfigurerUtils.getAuthorizationServerSettings(httpSecurity);
+		//请求匹配，用于匹配GET/POST方法，请求URI为/oauth2/authorize
+		this.requestMatcher = new OrRequestMatcher(
+				new AntPathRequestMatcher(
+						authorizationServerSettings.getAuthorizationEndpoint(),
+						HttpMethod.GET.name()),
+				new AntPathRequestMatcher(
+						authorizationServerSettings.getAuthorizationEndpoint(),
+						HttpMethod.POST.name()));
+        //创建默认的AuthenticationProvider集合，用于进行身份验证
+		List<AuthenticationProvider> authenticationProviders = createDefaultAuthenticationProviders(httpSecurity);
+		if (!this.authenticationProviders.isEmpty()) {
+			authenticationProviders.addAll(0, this.authenticationProviders);
+		}
+		this.authenticationProvidersConsumer.accept(authenticationProviders);
+		authenticationProviders.forEach(authenticationProvider ->
+				httpSecurity.authenticationProvider(postProcess(authenticationProvider)));
+	}
+
+	@Override
+	void configure(HttpSecurity httpSecurity) {
+	    //获取认证管理器，用于进行身份验证
+		AuthenticationManager authenticationManager = httpSecurity.getSharedObject(AuthenticationManager.class);
+		//获取AuthorizationServerSettings
+		AuthorizationServerSettings authorizationServerSettings = OAuth2ConfigurerUtils.getAuthorizationServerSettings(httpSecurity);
+
+        //创建OAuth2AuthorizationEndpointFilter,用于进行过滤 /oauth2/authorize的请求
+		OAuth2AuthorizationEndpointFilter authorizationEndpointFilter =
+				new OAuth2AuthorizationEndpointFilter(
+						authenticationManager,
+						authorizationServerSettings.getAuthorizationEndpoint());
+		//创建爱AuthenticationConverter集合，里面封装了OAuth2AuthorizationCodeRequestAuthenticationConverter和OAuth2AuthorizationConsentAuthenticationConverter，用于转换请求为Authentication
+		List<AuthenticationConverter> authenticationConverters = createDefaultAuthenticationConverters();
+		if (!this.authorizationRequestConverters.isEmpty()) {
+			authenticationConverters.addAll(0, this.authorizationRequestConverters);
+		}
+		this.authorizationRequestConvertersConsumer.accept(authenticationConverters);
+		authorizationEndpointFilter.setAuthenticationConverter(
+				new DelegatingAuthenticationConverter(authenticationConverters));
+		if (this.authorizationResponseHandler != null) {
+			authorizationEndpointFilter.setAuthenticationSuccessHandler(this.authorizationResponseHandler);
+		}
+		if (this.errorResponseHandler != null) {
+			authorizationEndpointFilter.setAuthenticationFailureHandler(this.errorResponseHandler);
+		}
+		if (StringUtils.hasText(this.consentPage)) {
+			authorizationEndpointFilter.setConsentPage(this.consentPage);
+		}
+		if (this.sessionAuthenticationStrategy != null) {
+			authorizationEndpointFilter.setSessionAuthenticationStrategy(this.sessionAuthenticationStrategy);
+		}
+		httpSecurity.addFilterBefore(postProcess(authorizationEndpointFilter), AbstractPreAuthenticatedProcessingFilter.class);
+	}
+
+	@Override
+	RequestMatcher getRequestMatcher() {
+		return this.requestMatcher;
+	}
+
+	private static List<AuthenticationConverter> createDefaultAuthenticationConverters() {
+		List<AuthenticationConverter> authenticationConverters = new ArrayList<>();
+
+		authenticationConverters.add(new OAuth2AuthorizationCodeRequestAuthenticationConverter());
+		authenticationConverters.add(new OAuth2AuthorizationConsentAuthenticationConverter());
+
+		return authenticationConverters;
+	}
+
+	private List<AuthenticationProvider> createDefaultAuthenticationProviders(HttpSecurity httpSecurity) {
+		List<AuthenticationProvider> authenticationProviders = new ArrayList<>();
+        //创建OAuth2AuthorizationCodeRequestAuthenticationProvider用于处理授权码模式的请求，里面封装了RegisteredClientRepository,OAuth2AuthorizationService和OAuth2AuthorizationConsentService
+		OAuth2AuthorizationCodeRequestAuthenticationProvider authorizationCodeRequestAuthenticationProvider =
+				new OAuth2AuthorizationCodeRequestAuthenticationProvider(
+						OAuth2ConfigurerUtils.getRegisteredClientRepository(httpSecurity),
+						OAuth2ConfigurerUtils.getAuthorizationService(httpSecurity),
+						OAuth2ConfigurerUtils.getAuthorizationConsentService(httpSecurity));
+		if (this.authorizationCodeRequestAuthenticationValidator != null) {
+			authorizationCodeRequestAuthenticationProvider.setAuthenticationValidator(
+					new OAuth2AuthorizationCodeRequestAuthenticationValidator()
+							.andThen(this.authorizationCodeRequestAuthenticationValidator));
+		}
+		authenticationProviders.add(authorizationCodeRequestAuthenticationProvider);
+
+		OAuth2AuthorizationConsentAuthenticationProvider authorizationConsentAuthenticationProvider =
+				new OAuth2AuthorizationConsentAuthenticationProvider(
+						OAuth2ConfigurerUtils.getRegisteredClientRepository(httpSecurity),
+						OAuth2ConfigurerUtils.getAuthorizationService(httpSecurity),
+						OAuth2ConfigurerUtils.getAuthorizationConsentService(httpSecurity));
+		authenticationProviders.add(authorizationConsentAuthenticationProvider);
+
+		return authenticationProviders;
+	}
+
+}
