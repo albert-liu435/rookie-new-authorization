@@ -17,7 +17,9 @@ public final class OAuth2AuthorizationEndpointConfigurer extends AbstractOAuth2C
 	private Consumer<OAuth2AuthorizationCodeRequestAuthenticationContext> authorizationCodeRequestAuthenticationValidator;
 	private SessionAuthenticationStrategy sessionAuthenticationStrategy;
 
-	OAuth2AuthorizationEndpointConfigurer(ObjectPostProcessor<Object> objectPostProcessor) {
+	OAuth2AuthorizationEndpointConfigurer(ObjectPostProcessor<Object> ob---------------------
+
+	jectPostProcessor) {
 		super(objectPostProcessor);
 	}
 
