@@ -459,3 +459,274 @@ OAuth2AuthorizationEndpointFilter#sendAuthorizationConsent()方法，该实例�
 
 通过里面的OAuth2AuthorizationCode authorizationCode = this.authorizationCodeGenerator.generate(tokenContext);方法生成code,并保存到oauth2_authorization中
 后续我们会拿着code去换取token
+
+经过的过滤器为:OAuth2TokenEndpointFilter
+主要方法如下：
+	@Override
+	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+			throws ServletException, IOException {
+
+		if (!this.tokenEndpointMatcher.matches(request)) {
+			filterChain.doFilter(request, response);
+			return;
+		}
+
+		try {
+		    //获取请求grant_type参数
+			String[] grantTypes = request.getParameterValues(OAuth2ParameterNames.GRANT_TYPE);
+			if (grantTypes == null || grantTypes.length != 1) {
+				throwError(OAuth2ErrorCodes.INVALID_REQUEST, OAuth2ParameterNames.GRANT_TYPE);
+			}
+            //转化为Authentication,默认为OAuth2AuthorizationCodeAuthenticationToken
+			Authentication authorizationGrantAuthentication = this.authenticationConverter.convert(request);
+			if (authorizationGrantAuthentication == null) {
+				throwError(OAuth2ErrorCodes.UNSUPPORTED_GRANT_TYPE, OAuth2ParameterNames.GRANT_TYPE);
+			}
+			if (authorizationGrantAuthentication instanceof AbstractAuthenticationToken) {
+				((AbstractAuthenticationToken) authorizationGrantAuthentication)
+						.setDetails(this.authenticationDetailsSource.buildDetails(request));
+			}
+            //进行身份验证
+			OAuth2AccessTokenAuthenticationToken accessTokenAuthentication =
+					(OAuth2AccessTokenAuthenticationToken) this.authenticationManager.authenticate(authorizationGrantAuthentication);
+			this.authenticationSuccessHandler.onAuthenticationSuccess(request, response, accessTokenAuthentication);
+		} catch (OAuth2AuthenticationException ex) {
+			SecurityContextHolder.clearContext();
+			if (this.logger.isTraceEnabled()) {
+				this.logger.trace(LogMessage.format("Token request failed: %s", ex.getError()), ex);
+			}
+			this.authenticationFailureHandler.onAuthenticationFailure(request, response, ex);
+		}
+	}
+
+默认通过OAuth2AuthorizationCodeAuthenticationConverter进行转化请求为OAuth2AuthorizationCodeAuthenticationToken，
+后续通过OAuth2AuthorizationCodeAuthenticationProvider进行身份验证,验证逻辑为
+
+	@Override
+	public Authentication authenticate(Authentication authentication) throws AuthenticationException {
+	    //转化为OAuth2AuthorizationCodeAuthenticationToken
+		OAuth2AuthorizationCodeAuthenticationToken authorizationCodeAuthentication =
+				(OAuth2AuthorizationCodeAuthenticationToken) authentication;
+        //获取客户端的认证信息
+		OAuth2ClientAuthenticationToken clientPrincipal =
+				getAuthenticatedClientElseThrowInvalidClient(authorizationCodeAuthentication);
+		//RegisteredClient
+		RegisteredClient registeredClient = clientPrincipal.getRegisteredClient();
+
+		if (this.logger.isTraceEnabled()) {
+			this.logger.trace("Retrieved registered client");
+		}
+        //通过code查询并返回OAuth2Authorization
+		OAuth2Authorization authorization = this.authorizationService.findByToken(
+				authorizationCodeAuthentication.getCode(), AUTHORIZATION_CODE_TOKEN_TYPE);
+		if (authorization == null) {
+			throw new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_GRANT);
+		}
+
+		if (this.logger.isTraceEnabled()) {
+			this.logger.trace("Retrieved authorization with authorization code");
+		}
+        //获取Token,里面包含了code和有效期等信息
+		OAuth2Authorization.Token<OAuth2AuthorizationCode> authorizationCode =
+				authorization.getToken(OAuth2AuthorizationCode.class);
+        //获取OAuth2AuthorizationRequest
+		OAuth2AuthorizationRequest authorizationRequest = authorization.getAttribute(
+				OAuth2AuthorizationRequest.class.getName());
+
+		if (!registeredClient.getClientId().equals(authorizationRequest.getClientId())) {
+			if (!authorizationCode.isInvalidated()) {
+				// Invalidate the authorization code given that a different client is attempting to use it
+				authorization = OAuth2AuthenticationProviderUtils.invalidate(authorization, authorizationCode.getToken());
+				this.authorizationService.save(authorization);
+				if (this.logger.isWarnEnabled()) {
+					this.logger.warn(LogMessage.format("Invalidated authorization code used by registered client '%s'", registeredClient.getId()));
+				}
+			}
+			throw new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_GRANT);
+		}
+
+		if (StringUtils.hasText(authorizationRequest.getRedirectUri()) &&
+				!authorizationRequest.getRedirectUri().equals(authorizationCodeAuthentication.getRedirectUri())) {
+			throw new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_GRANT);
+		}
+
+		if (!authorizationCode.isActive()) {
+			if (authorizationCode.isInvalidated()) {
+				OAuth2Token token = authorization.getRefreshToken() != null ?
+						authorization.getRefreshToken().getToken() :
+						authorization.getAccessToken().getToken();
+				if (token != null) {
+					// Invalidate the access (and refresh) token as the client is attempting to use the authorization code more than once
+					authorization = OAuth2AuthenticationProviderUtils.invalidate(authorization, token);
+					this.authorizationService.save(authorization);
+					if (this.logger.isWarnEnabled()) {
+						this.logger.warn(LogMessage.format("Invalidated authorization token(s) previously issued to registered client '%s'", registeredClient.getId()));
+					}
+				}
+			}
+			throw new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_GRANT);
+		}
+
+		if (this.logger.isTraceEnabled()) {
+			this.logger.trace("Validated token request parameters");
+		}
+        //获取Authentication,默认为UsernamePasswordAuthenticationToken
+		Authentication principal = authorization.getAttribute(Principal.class.getName());
+
+		// @formatter:off
+		DefaultOAuth2TokenContext.Builder tokenContextBuilder = DefaultOAuth2TokenContext.builder()
+				.registeredClient(registeredClient)
+				.principal(principal)
+				.authorizationServerContext(AuthorizationServerContextHolder.getContext())
+				.authorization(authorization)
+				.authorizedScopes(authorization.getAuthorizedScopes())
+				.authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+				.authorizationGrant(authorizationCodeAuthentication);
+		// @formatter:on
+
+		OAuth2Authorization.Builder authorizationBuilder = OAuth2Authorization.from(authorization);
+
+        //用于创建Access token的逻辑
+		// ----- Access token -----
+		OAuth2TokenContext tokenContext = tokenContextBuilder.tokenType(OAuth2TokenType.ACCESS_TOKEN).build();
+		OAuth2Token generatedAccessToken = this.tokenGenerator.generate(tokenContext);
+		if (generatedAccessToken == null) {
+			OAuth2Error error = new OAuth2Error(OAuth2ErrorCodes.SERVER_ERROR,
+					"The token generator failed to generate the access token.", ERROR_URI);
+			throw new OAuth2AuthenticationException(error);
+		}
+
+		if (this.logger.isTraceEnabled()) {
+			this.logger.trace("Generated access token");
+		}
+        //封装OAuth2AccessToken
+		OAuth2AccessToken accessToken = new OAuth2AccessToken(OAuth2AccessToken.TokenType.BEARER,
+				generatedAccessToken.getTokenValue(), generatedAccessToken.getIssuedAt(),
+				generatedAccessToken.getExpiresAt(), tokenContext.getAuthorizedScopes());
+		if (generatedAccessToken instanceof ClaimAccessor) {
+			authorizationBuilder.token(accessToken, (metadata) ->
+					metadata.put(OAuth2Authorization.Token.CLAIMS_METADATA_NAME, ((ClaimAccessor) generatedAccessToken).getClaims()));
+		} else {
+			authorizationBuilder.accessToken(accessToken);
+		}
+
+		// ----- Refresh token -----
+		OAuth2RefreshToken refreshToken = null;
+		if (registeredClient.getAuthorizationGrantTypes().contains(AuthorizationGrantType.REFRESH_TOKEN) &&
+				// Do not issue refresh token to public client
+				!clientPrincipal.getClientAuthenticationMethod().equals(ClientAuthenticationMethod.NONE)) {
+
+			tokenContext = tokenContextBuilder.tokenType(OAuth2TokenType.REFRESH_TOKEN).build();
+			OAuth2Token generatedRefreshToken = this.tokenGenerator.generate(tokenContext);
+			if (!(generatedRefreshToken instanceof OAuth2RefreshToken)) {
+				OAuth2Error error = new OAuth2Error(OAuth2ErrorCodes.SERVER_ERROR,
+						"The token generator failed to generate the refresh token.", ERROR_URI);
+				throw new OAuth2AuthenticationException(error);
+			}
+
+			if (this.logger.isTraceEnabled()) {
+				this.logger.trace("Generated refresh token");
+			}
+
+			refreshToken = (OAuth2RefreshToken) generatedRefreshToken;
+			authorizationBuilder.refreshToken(refreshToken);
+		}
+
+		// ----- ID token -----
+		OidcIdToken idToken;
+		if (authorizationRequest.getScopes().contains(OidcScopes.OPENID)) {
+			SessionInformation sessionInformation = getSessionInformation(principal);
+			if (sessionInformation != null) {
+				try {
+					// Compute (and use) hash for Session ID
+					sessionInformation = new SessionInformation(sessionInformation.getPrincipal(),
+							createHash(sessionInformation.getSessionId()), sessionInformation.getLastRequest());
+				} catch (NoSuchAlgorithmException ex) {
+					OAuth2Error error = new OAuth2Error(OAuth2ErrorCodes.SERVER_ERROR,
+							"Failed to compute hash for Session ID.", ERROR_URI);
+					throw new OAuth2AuthenticationException(error);
+				}
+				tokenContextBuilder.put(SessionInformation.class, sessionInformation);
+			}
+			// @formatter:off
+			tokenContext = tokenContextBuilder
+					.tokenType(ID_TOKEN_TOKEN_TYPE)
+					.authorization(authorizationBuilder.build())	// ID token customizer may need access to the access token and/or refresh token
+					.build();
+			// @formatter:on
+			OAuth2Token generatedIdToken = this.tokenGenerator.generate(tokenContext);
+			if (!(generatedIdToken instanceof Jwt)) {
+				OAuth2Error error = new OAuth2Error(OAuth2ErrorCodes.SERVER_ERROR,
+						"The token generator failed to generate the ID token.", ERROR_URI);
+				throw new OAuth2AuthenticationException(error);
+			}
+
+			if (this.logger.isTraceEnabled()) {
+				this.logger.trace("Generated id token");
+			}
+
+			idToken = new OidcIdToken(generatedIdToken.getTokenValue(), generatedIdToken.getIssuedAt(),
+					generatedIdToken.getExpiresAt(), ((Jwt) generatedIdToken).getClaims());
+			authorizationBuilder.token(idToken, (metadata) ->
+					metadata.put(OAuth2Authorization.Token.CLAIMS_METADATA_NAME, idToken.getClaims()));
+		} else {
+			idToken = null;
+		}
+
+		authorization = authorizationBuilder.build();
+
+		// Invalidate the authorization code as it can only be used once
+		authorization = OAuth2AuthenticationProviderUtils.invalidate(authorization, authorizationCode.getToken());
+        //保存OAuth2Authorization
+		this.authorizationService.save(authorization);
+
+		if (this.logger.isTraceEnabled()) {
+			this.logger.trace("Saved authorization");
+		}
+
+		Map<String, Object> additionalParameters = Collections.emptyMap();
+		if (idToken != null) {
+			additionalParameters = new HashMap<>();
+			additionalParameters.put(OidcParameterNames.ID_TOKEN, idToken.getTokenValue());
+		}
+
+		if (this.logger.isTraceEnabled()) {
+			this.logger.trace("Authenticated token request");
+		}
+        //返回OAuth2AccessTokenAuthenticationToken
+		return new OAuth2AccessTokenAuthenticationToken(
+				registeredClient, clientPrincipal, accessToken, refreshToken, additionalParameters);
+	}
+上面处理完成之后，该OAuth2AccessTokenAuthenticationToken里面封装了accessToken,refreshToken等信息
+调用OAuth2TokenEndpointFilter#sendAccessTokenResponse方法进行响应
+
+	private void sendAccessTokenResponse(HttpServletRequest request, HttpServletResponse response,
+			Authentication authentication) throws IOException {
+
+		OAuth2AccessTokenAuthenticationToken accessTokenAuthentication =
+				(OAuth2AccessTokenAuthenticationToken) authentication;
+
+		OAuth2AccessToken accessToken = accessTokenAuthentication.getAccessToken();
+		OAuth2RefreshToken refreshToken = accessTokenAuthentication.getRefreshToken();
+		Map<String, Object> additionalParameters = accessTokenAuthentication.getAdditionalParameters();
+
+		OAuth2AccessTokenResponse.Builder builder =
+				OAuth2AccessTokenResponse.withToken(accessToken.getTokenValue())
+						.tokenType(accessToken.getTokenType())
+						.scopes(accessToken.getScopes());
+		if (accessToken.getIssuedAt() != null && accessToken.getExpiresAt() != null) {
+			builder.expiresIn(ChronoUnit.SECONDS.between(accessToken.getIssuedAt(), accessToken.getExpiresAt()));
+		}
+		if (refreshToken != null) {
+			builder.refreshToken(refreshToken.getTokenValue());
+		}
+		if (!CollectionUtils.isEmpty(additionalParameters)) {
+			builder.additionalParameters(additionalParameters);
+		}
+		OAuth2AccessTokenResponse accessTokenResponse = builder.build();
+		ServletServerHttpResponse httpResponse = new ServletServerHttpResponse(response);
+		this.accessTokenHttpResponseConverter.write(accessTokenResponse, null, httpResponse);
+	}
+
+最终通过OAuth2AccessTokenResponseHttpMessageConverter写入到响应中
+
