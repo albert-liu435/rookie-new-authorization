@@ -1,0 +1,22 @@
+1、客户端模式
+客户端模式如图：
+1723102109959.png
+1723102263566.png
+同样会经过过滤器 OAuth2TokenEndpointFilter
+里面的方法Authentication authorizationGrantAuthentication = this.authenticationConverter.convert(request);会生成OAuth2ClientCredentialsAuthenticationToken
+然后通过OAuth2ClientCredentialsAuthenticationProvider进行认证并生成OAuth2AccessTokenAuthenticationToken返回给客户端
+
+
+PKCE模式：
+登录https://tonyxu-io.github.io/pkce-generator/
+网站进行生成
+
+Code Verifier：g8gx-9RWxYxE5HXFxMQmJ9tbIaORY8ukdhOIClskg4E
+Code Challenge：4aszSXBEbdfcty0NoTO68dvNinjWa3fYqTJMLZ1cMAE
+
+
+http://127.0.0.1:8080/oauth2/authorize?response_type=code&client_id=pkce-message-client&redirect_uri=http://127.0.0.1:8080/login/oauth2/code/messaging-client-oidc&scope=message.read&code_challenge=4aszSXBEbdfcty0NoTO68dvNinjWa3fYqTJMLZ1cMAE&code_challenge_method=S256
+进行登录后重定向到
+http://127.0.0.1:8080/login/oauth2/code/messaging-client-oidc?code=6f-sh77afmxQbYh59hCdwp09MZYMIG6TxXt6aQvcJClYGNzEgbSwK3ZKK1TcqMkLZntyxXXG6MU_Wd9E_Vd9IItAIQeFgJsgx8BYSjenViWW-nD77fkDlMKZgCt_81_4
+随后进行获取accesstoken
+1723106133173.png

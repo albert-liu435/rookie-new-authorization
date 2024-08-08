@@ -92,6 +92,7 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
                 .oidc(Customizer.withDefaults())
                 // 设置自定义用户确认授权页
                 .authorizationEndpoint(authorizationEndpoint -> authorizationEndpoint.consentPage(CUSTOM_CONSENT_PAGE_URI));
+
         http
                 // 当未登录时访问认证端点时重定向至login页面
                 .exceptionHandling((exceptions) -> exceptions
@@ -193,6 +194,10 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
         if (repositoryByClientId == null) {
             registeredClientRepository.save(registeredClient);
         }
+
+
+
+
         // 设备码授权客户端
         RegisteredClient deviceClient = RegisteredClient.withId(UUID.randomUUID().toString())
                 .clientId("device-message-client")
@@ -211,6 +216,28 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
         if (byClientId == null) {
             registeredClientRepository.save(deviceClient);
         }
+
+        // PKCE客户端
+        RegisteredClient pkceClient = RegisteredClient.withId(UUID.randomUUID().toString())
+                .clientId("pkce-message-client")
+                // 公共客户端
+                .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
+                // 设备码授权
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+                // 授权码模式回调地址，oauth2.1已改为精准匹配，不能只设置域名，并且屏蔽了localhost，本机使用127.0.0.1访问
+                .redirectUri("http://127.0.0.1:8080/login/oauth2/code/messaging-client-oidc")
+                .redirectUri("https://www.baidu.com")
+                .clientSettings(ClientSettings.builder().requireProofKey(Boolean.TRUE).build())
+                // 自定scope
+                .scope("message.read")
+                .scope("message.write")
+                .build();
+        RegisteredClient findPkceClient = registeredClientRepository.findByClientId(pkceClient.getClientId());
+        if (findPkceClient == null) {
+            registeredClientRepository.save(pkceClient);
+        }
+
         return registeredClientRepository;
     }
 
