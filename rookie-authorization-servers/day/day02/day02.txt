@@ -1,3 +1,4 @@
+授权码模式:
 请求 http://127.0.0.1:8080/oauth2/authorize?client_id=messaging-client&response_type=code&scope=message.read&redirect_uri=https://www.baidu.com
 请求流程authorization_code.png
 第一次请求的时候，最终会通过OAuth2AuthorizationCodeRequestAuthenticationConverter中集合中的OAuth2AuthorizationCodeRequestAuthenticationConverter进行转换，
@@ -459,6 +460,8 @@ OAuth2AuthorizationEndpointFilter#sendAuthorizationConsent()方法，该实例�
 
 通过里面的OAuth2AuthorizationCode authorizationCode = this.authorizationCodeGenerator.generate(tokenContext);方法生成code,并保存到oauth2_authorization中
 后续我们会拿着code去换取token
+1723100496754.png
+1723100512770.png
 
 经过的过滤器为:OAuth2TokenEndpointFilter
 主要方法如下：
@@ -730,3 +733,5 @@ OAuth2AuthorizationEndpointFilter#sendAuthorizationConsent()方法，该实例�
 
 最终通过OAuth2AccessTokenResponseHttpMessageConverter写入到响应中
 
+通过携带token进行访问即可
+1723100968224.png

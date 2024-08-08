@@ -164,7 +164,9 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
                 // 配置资源服务器使用该客户端获取授权时支持的方式
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                //refresh_token的方式
                 .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+                //客户端的方式
                 .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
                 // 授权码模式回调地址，oauth2.1已改为精准匹配，不能只设置域名，并且屏蔽了localhost，本机使用127.0.0.1访问
                 .redirectUri("http://127.0.0.1:8080/login/oauth2/code/messaging-client-oidc")
