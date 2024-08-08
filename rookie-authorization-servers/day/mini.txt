@@ -1,5 +1,6 @@
 最小配置为在Springboot项目中配置如下yml文件 参考项目分支 feature/day01
 
+
 在yml文件中配置如下：
 配置授权服务器的用户名和密码，配置客户端的客户端ID,客户端密钥，客户端的认证方式为请求头的认证,配置资源服务器使用该客户端获取授权时支持的方式,授权码模式回调地址，oauth2.1已改为精准匹配，不能只设置域名，并且屏蔽了localhost，本机使用127.0.0.1访问, 该客户端的授权范围，OPENID与PROFILE是IdToken的scope，获取授权时请求OPENID的scope时认证服务会返回IdToken,客户端设置，require-authorization-consent设置用户需要确认授权
 
