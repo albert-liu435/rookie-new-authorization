@@ -115,6 +115,7 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
                 .deviceVerificationEndpoint(deviceVerificationEndpoint ->
                         deviceVerificationEndpoint.consentPage(CUSTOM_CONSENT_PAGE_URI)
                 )
+//                .clientAuthentication(Customizer.withDefaults());
                 .clientAuthentication(clientAuthentication ->
                         // 客户端认证添加设备码的converter和provider
                         clientAuthentication
