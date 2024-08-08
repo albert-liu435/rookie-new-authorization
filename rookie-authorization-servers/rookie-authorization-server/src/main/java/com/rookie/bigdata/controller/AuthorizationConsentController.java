@@ -26,7 +26,7 @@ import java.util.*;
  */
 @Controller
 @RequiredArgsConstructor
-public class AuthorizationController {
+public class AuthorizationConsentController {
 
 
     private final RegisteredClientRepository registeredClientRepository;

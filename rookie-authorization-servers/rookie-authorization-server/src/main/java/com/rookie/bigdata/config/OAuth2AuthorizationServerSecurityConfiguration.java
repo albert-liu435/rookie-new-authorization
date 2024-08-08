@@ -5,6 +5,9 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
+import com.rookie.bigdata.authorization.DeviceClientAuthenticationProvider;
+import com.rookie.bigdata.util.KeyUtils;
+import com.rookie.bigdata.web.authentication.DeviceClientAuthenticationConverter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -41,10 +44,13 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 
+import java.io.IOException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.NoSuchAlgorithmException;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.security.spec.InvalidKeySpecException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -83,15 +89,38 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
      * @throws Exception 抛出
      */
     @Bean
-    public SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http,
+                                                                      RegisteredClientRepository registeredClientRepository,
+                                                                      AuthorizationServerSettings authorizationServerSettings) throws Exception {
         // 配置默认的设置，忽略认证端点的csrf校验
         OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http);
+
+        // 新建设备码converter和provider
+        DeviceClientAuthenticationConverter deviceClientAuthenticationConverter =
+                new DeviceClientAuthenticationConverter(authorizationServerSettings.getDeviceAuthorizationEndpoint());
+        DeviceClientAuthenticationProvider deviceClientAuthenticationProvider =
+                new DeviceClientAuthenticationProvider(registeredClientRepository);
+
 
         http.getConfigurer(OAuth2AuthorizationServerConfigurer.class)
                 // 开启OpenID Connect 1.0协议相关端点
                 .oidc(Customizer.withDefaults())
                 // 设置自定义用户确认授权页
-                .authorizationEndpoint(authorizationEndpoint -> authorizationEndpoint.consentPage(CUSTOM_CONSENT_PAGE_URI));
+                .authorizationEndpoint(authorizationEndpoint -> authorizationEndpoint.consentPage(CUSTOM_CONSENT_PAGE_URI))
+                // 设置设备码用户验证url(自定义用户验证页)
+                .deviceAuthorizationEndpoint(deviceAuthorizationEndpoint ->
+                        deviceAuthorizationEndpoint.verificationUri("/activate")
+                )
+                // 设置验证设备码用户确认页面
+                .deviceVerificationEndpoint(deviceVerificationEndpoint ->
+                        deviceVerificationEndpoint.consentPage(CUSTOM_CONSENT_PAGE_URI)
+                )
+                .clientAuthentication(clientAuthentication ->
+                        // 客户端认证添加设备码的converter和provider
+                        clientAuthentication
+                                .authenticationConverter(deviceClientAuthenticationConverter)
+                                .authenticationProvider(deviceClientAuthenticationProvider)
+                );
 
         http
                 // 当未登录时访问认证端点时重定向至login页面
@@ -196,8 +225,6 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
         }
 
 
-
-
         // 设备码授权客户端
         RegisteredClient deviceClient = RegisteredClient.withId(UUID.randomUUID().toString())
                 .clientId("device-message-client")
@@ -209,8 +236,10 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
                 // 自定scope
                 .scope("message.read")
                 .scope("message.write")
-                //有效期设置为12年，如果不设置的话，默认为当前时间，则马上回过期不能使用
+                //有效期设置为12年，如果不设置的话，默认为当前时间，则马上回过期不能使用,这里是为了测试方便，所以写了一个较长的时间，如果在生产环境则需要设置一个相对合理的时间
                 .clientSecretExpiresAt(Instant.now().plus(12 * 365, ChronoUnit.DAYS))
+                //设置2天有效期
+                .tokenSettings(TokenSettings.builder().authorizationCodeTimeToLive(Duration.ofDays(2)).accessTokenTimeToLive(Duration.ofDays(2)).build())
                 .build();
         RegisteredClient byClientId = registeredClientRepository.findByClientId(deviceClient.getClientId());
         if (byClientId == null) {
@@ -273,10 +302,12 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
      * @return JWKSource
      */
     @Bean
-    public JWKSource<SecurityContext> jwkSource() {
-        KeyPair keyPair = generateRsaKey();
-        RSAPublicKey publicKey = (RSAPublicKey) keyPair.getPublic();
-        RSAPrivateKey privateKey = (RSAPrivateKey) keyPair.getPrivate();
+    public JWKSource<SecurityContext> jwkSource() throws IOException, NoSuchAlgorithmException, InvalidKeySpecException {
+//        KeyPair keyPair = generateRsaKey();
+//        RSAPublicKey publicKey = (RSAPublicKey) keyPair.getPublic();
+//        RSAPrivateKey privateKey = (RSAPrivateKey) keyPair.getPrivate();
+        RSAPrivateKey privateKey = KeyUtils.getRSAPrivateKey("pkcs/app.key");
+        RSAPublicKey publicKey = KeyUtils.getRSAPublicKey("pkcs/app.pub");
         RSAKey rsaKey = new RSAKey.Builder(publicKey)
                 .privateKey(privateKey)
                 .keyID(UUID.randomUUID().toString())
