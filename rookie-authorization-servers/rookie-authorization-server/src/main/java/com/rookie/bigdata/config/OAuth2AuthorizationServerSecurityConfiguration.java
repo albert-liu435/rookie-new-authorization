@@ -8,6 +8,7 @@ import com.nimbusds.jose.proc.SecurityContext;
 import com.rookie.bigdata.authorization.DeviceClientAuthenticationProvider;
 import com.rookie.bigdata.util.KeyUtils;
 import com.rookie.bigdata.authorization.web.authentication.DeviceClientAuthenticationConverter;
+import com.rookie.bigdata.util.SecurityUtils;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
@@ -158,7 +159,26 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
 
         // 添加BearerTokenAuthenticationFilter，将认证服务当做一个资源服务，解析请求头中的token
         http.oauth2ResourceServer((resourceServer) -> resourceServer
-                .jwt(Customizer.withDefaults()));
+                        .jwt(Customizer.withDefaults())
+//                        //自定义类实现
+//                        .accessDeniedHandler(new CustomerAccessDeniedHandler())
+//                        .authenticationEntryPoint(new CustomerAuthenticationEntryPoint())
+//                //匿名类实现自定义处理
+//                        .accessDeniedHandler((request,response,accessDeniedException)->{
+//                            Map<String, String> parameters = SecurityUtils.getErrorParameter(request, response, accessDeniedException);
+//                            String wwwAuthenticate = SecurityUtils.computeWwwAuthenticateHeaderValue(parameters);
+//                            response.addHeader(HttpHeaders.WWW_AUTHENTICATE, wwwAuthenticate);
+//                            try {
+//                                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+//                                response.getWriter().write(JsonUtils.objectCovertToJson(parameters));
+//                                response.getWriter().flush();
+//                            } catch (IOException ex) {
+//                                logger.error("写回错误信息失败", accessDeniedException);
+//                            }})
+
+                        .accessDeniedHandler(SecurityUtils::exceptionHandler)
+                        .authenticationEntryPoint(SecurityUtils::exceptionHandler)
+        );
 
         return http.build();
     }
