@@ -7,8 +7,7 @@ import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import com.rookie.bigdata.authorization.DeviceClientAuthenticationProvider;
 import com.rookie.bigdata.util.KeyUtils;
-import com.rookie.bigdata.web.authentication.DeviceClientAuthenticationConverter;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.rookie.bigdata.authorization.web.authentication.DeviceClientAuthenticationConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
@@ -54,9 +53,6 @@ import java.security.spec.InvalidKeySpecException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.time.temporal.TemporalUnit;
-import java.util.Collections;
-import java.util.List;
 import java.util.UUID;
 
 

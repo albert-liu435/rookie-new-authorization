@@ -1,4 +1,4 @@
-package com.rookie.bigdata.web.authentication;
+package com.rookie.bigdata.authorization.web.authentication;
 
 import com.rookie.bigdata.authorization.DeviceClientAuthenticationToken;
 import jakarta.servlet.http.HttpServletRequest;
