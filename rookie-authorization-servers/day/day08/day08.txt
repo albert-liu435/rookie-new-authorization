@@ -1,0 +1,36 @@
+为了方便测试，我们设置本机host映射关系如下：
+127.0.0.1 rookie-authorization.client.com
+127.0.0.1 rookie-authorization.server.com
+
+认证流程图：7785ad73367b49e4a3b07d82db328a82~tplv-k3u1fbpfcp-jj-mark_3024_0_0_0_q75.webp
+
+
+
+
+机制说明
+看到这里可能有些读者会比较疑惑，比如框架怎么知道认证服务器授权接口的地址？框架怎么知道认证服务获取token的接口？项目在初始化时会根据配置的issuer-uri拼接url，即签发地址根目录/.well-known/openid-configuration，像项目中配置的就是http://rookie-authorization.server.com:8080/.well-known/openid-configuration ；该接口会返回认证服务器的元信息
+
+
+签发地址目录: http://rookie-authorization.server.com:8080/.well-known/openid-configuration
+
+第一次请求
+http://rookie-authorization.client.com:8000/app
+经过OAuth2AuthorizationRequestRedirectFilter过滤器,由于是第一次请求，所以都会放行，最后经过ExceptionTranslationFilter过滤器,抛出的异常为org.springframework.security.access.AccessDeniedException: Access Denied，然后通过LoginUrlAuthenticationEntryPoint进行构建重定向url:http://rookie-authorization.client.com:8000/oauth2/authorization/messaging-client-oidc,这个url地址是在启动的时候，由getLoginLinks#getLoginLinks方法生成的。紧接着会再次经过OAuth2AuthorizationRequestRedirectFilter过滤器，然后通过DefaultOAuth2AuthorizationRequestResolver#resolve()方法获取registrationId为messaging-client-oidc,从请求中获取action参数的值，如果不存在，则默认为login，然后查询出ClientRegistration，构建重定向页面 http://rookie-authorization.client.com:8000/login/oauth2/code/messaging-client-oidc,认证请求为http://rookie-authorization.server.com:8080/oauth2/authorize?response_type=code&client_id=messaging-client&scope=message.read message.write openid profile&state=OTPZEg9a-oax7O14UO7Ps3PRnNH95LOD-D-gfcBPnVI=&redirect_uri=http://rookie-authorization.client.com:8000/login/oauth2/code/messaging-client-oidc&nonce=tjLdamjgaCuZLOF9n5uvxpFPfo7g0HO-Pt8ce-fDLus,这个地址类似我们最早之前进行换取code的地址。
+输入账号密码后，点击进行登录，会进行第二次回调到客户端,进行code换取token的操作
+具体逻辑是由OAuth2LoginAuthenticationFilter进行处理的
+
+
+
+
+
+
+
+
+
+
+
+
+
+client涉及到的类为：OAuth2ClientAutoConfiguration
+OAuth2ClientRegistrationRepositoryConfiguration
+OAuth2WebSecurityConfiguration
