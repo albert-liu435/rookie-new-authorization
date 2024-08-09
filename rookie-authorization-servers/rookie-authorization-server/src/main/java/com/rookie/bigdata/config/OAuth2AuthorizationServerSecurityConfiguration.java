@@ -18,6 +18,7 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -26,6 +27,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.oidc.OidcScopes;
+import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
@@ -39,6 +41,11 @@ import org.springframework.security.oauth2.server.authorization.config.annotatio
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
+import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
+import org.springframework.security.oauth2.server.authorization.web.authentication.OAuth2DeviceCodeAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
@@ -54,7 +61,8 @@ import java.security.spec.InvalidKeySpecException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 
 /**
@@ -92,6 +100,7 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
         // 配置默认的设置，忽略认证端点的csrf校验
         OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http);
 
+
         // 新建设备码converter和provider
         DeviceClientAuthenticationConverter deviceClientAuthenticationConverter =
                 new DeviceClientAuthenticationConverter(authorizationServerSettings.getDeviceAuthorizationEndpoint());
@@ -104,14 +113,19 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
                 .oidc(Customizer.withDefaults())
                 // 设置自定义用户确认授权页
                 .authorizationEndpoint(authorizationEndpoint -> authorizationEndpoint.consentPage(CUSTOM_CONSENT_PAGE_URI))
+
                 // 设置设备码用户验证url(自定义用户验证页)
                 .deviceAuthorizationEndpoint(deviceAuthorizationEndpoint ->
                         deviceAuthorizationEndpoint.verificationUri("/activate")
                 )
+
                 // 设置验证设备码用户确认页面
                 .deviceVerificationEndpoint(deviceVerificationEndpoint ->
                         deviceVerificationEndpoint.consentPage(CUSTOM_CONSENT_PAGE_URI)
                 )
+//                                .clientAuthentication(clientAuthentication ->
+//                        clientAuthentication.authenticationConverter(new OAuth2DeviceCodeAuthenticationConverter()))
+//                ;
 //                .clientAuthentication(Customizer.withDefaults());
                 .clientAuthentication(clientAuthentication ->
                         // 客户端认证添加设备码的converter和provider
@@ -182,6 +196,58 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
 
         return http.build();
     }
+
+    /**
+     * 自定义jwt，将权限信息放至jwt中
+     *
+     * @return OAuth2TokenCustomizer的实例
+     */
+    @Bean
+    public OAuth2TokenCustomizer<JwtEncodingContext> oAuth2TokenCustomizer() {
+        return context -> {
+            // 检查登录用户信息是不是UserDetails，排除掉没有用户参与的流程
+            if (context.getPrincipal().getPrincipal() instanceof UserDetails user) {
+                // 获取申请的scopes
+                Set<String> scopes = context.getAuthorizedScopes();
+                // 获取用户的权限
+                Collection<? extends GrantedAuthority> authorities = user.getAuthorities();
+                // 提取权限并转为字符串
+                Set<String> authoritySet = Optional.ofNullable(authorities).orElse(Collections.emptyList()).stream()
+                        // 获取权限字符串
+                        .map(GrantedAuthority::getAuthority)
+                        // 去重
+                        .collect(Collectors.toSet());
+
+                // 合并scope与用户信息
+                authoritySet.addAll(scopes);
+
+                JwtClaimsSet.Builder claims = context.getClaims();
+                // 将权限信息放入jwt的claims中（也可以生成一个以指定字符分割的字符串放入）
+                claims.claim("authorities", authoritySet);
+                // 放入其它自定内容
+                // 角色、头像...
+            }
+        };
+    }
+
+    /**
+     * 自定义jwt解析器，设置解析出来的权限信息的前缀与在jwt中的key
+     *
+     * @return jwt解析器 JwtAuthenticationConverter
+     */
+    @Bean
+    public JwtAuthenticationConverter jwtAuthenticationConverter() {
+        JwtGrantedAuthoritiesConverter grantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
+        // 设置解析权限信息的前缀，设置为空是去掉前缀
+        grantedAuthoritiesConverter.setAuthorityPrefix("");
+        // 设置权限信息在jwt claims中的key
+        grantedAuthoritiesConverter.setAuthoritiesClaimName("authorities");
+
+        JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();
+        jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(grantedAuthoritiesConverter);
+        return jwtAuthenticationConverter;
+    }
+
 
     /**
      * 配置密码解析器，使用BCrypt的方式对密码进行加密和验证

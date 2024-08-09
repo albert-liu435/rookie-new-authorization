@@ -1,0 +1,68 @@
+
+对于这段代码的理解
+    public OAuth2TokenCustomizer<JwtEncodingContext> oAuth2TokenCustomizer() {
+        return context -> {
+            //校验登录用户信息是不是UserDetails,排除掉没有用户参与的流程
+            if (context.getPrincipal().getPrincipal() instanceof UserDetails user) {
+                //获取申请的scopes
+                Set<String> scopes = context.getAuthorizedScopes();
+                //获取用户的权限
+                Collection<? extends GrantedAuthority> authorities = user.getAuthorities();
+                //提取权限并转为字符串
+                Set<String> authoritySet = Optional
+                        .ofNullable(authorities)
+                        .orElse(Collections.emptyList())
+                        .stream()
+                        //获取权限字符串
+                        .map(GrantedAuthority::getAuthority)
+                        //去重
+                        .collect(Collectors.toSet());
+                //合并scope与用户信息
+                authoritySet.addAll(scopes);
+
+                JwtClaimsSet.Builder claims = context.getClaims();
+                // 将权限信息放入jwt的claims中（也可以生成一个以指定字符分割的字符串放入）
+                claims.claim("authorities", authoritySet);
+                // 放入其它自定内容
+                // 角色、头像...
+            }
+        };
+    }
+
+通过OAuth2TokenEndpointConfigurer中的createDefaultAuthenticationProviders方法中生成OAuth2TokenGenerator时将该OAuth2TokenCustomizer实例添加到OAuth2TokenGenerator,具体可以查看如下方法
+OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator = OAuth2ConfigurerUtils.getTokenGenerator(httpSecurity);
+然后将OAuth2TokenGenerator注入到OAuth2AuthorizationCodeAuthenticationProvider,最终在通过请求经过OAuth2TokenEndpointFilter过滤器时，会通过OAuth2AuthorizationCodeAuthenticationProvider去生成token,具体可以查看JwtGenerator#generate()方法，里面会判断OAuth2TokenCustomizer是否为null,如果不为null的话就会添加权限信息到JWT中
+
+同理
+    @Bean
+    public JwtAuthenticationConverter jwtAuthenticationConverter() {
+        JwtGrantedAuthoritiesConverter grantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
+        // 设置解析权限信息的前缀，设置为空是去掉前缀
+        grantedAuthoritiesConverter.setAuthorityPrefix("");
+        // 设置权限信息在jwt claims中的key
+        grantedAuthoritiesConverter.setAuthoritiesClaimName("authorities");
+
+        JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();
+        jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(grantedAuthoritiesConverter);
+        return jwtAuthenticationConverter;
+    }
+
+通过OAuth2ResourceServerConfigurer中的init方法,通过AuthenticationProvider authenticationProvider = getAuthenticationProvider();将注入JwtAuthenticationConverter到NimbusJwtDecoder，并将NimbusJwtDecoder注入到JwtAuthenticationProvider，后续在携带token请求的时候，会进行通过BearerTokenAuthenticationFilter进行过滤，然后通过JwtAuthenticationConverter解析token，最终通过AuthorizationFilter进行判断权限等信息
+
+我们以授权码模式进行实验如下：
+浏览器访问 http://127.0.0.1:8080/oauth2/authorize?client_id=messaging-client&response_type=code&scope=message.read&redirect_uri=https://www.baidu.com 进行账号密码登录，并进行授权
+剩下调用接口方式跟前面一致
+
+
+查看token信息：
+https://www.box3.cn/tools/jwt.html
+
+
+
+
+
+
+
+
+
+
