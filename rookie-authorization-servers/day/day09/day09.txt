@@ -1,0 +1,46 @@
+操作步骤:
+1、进入浏览器，输入如下：http://rookie-authorization.server.com:8080/oauth2/authorize?client_id=messaging-client&response_type=code&scope=message.read&redirect_uri=https://www.baidu.com 然后登录
+2、通过http://rookie-authorization.server.com:8080/oauth2/token换取token
+3、进行访问认证:http://rookie-authorization.resource.com:8100/test01
+
+
+为了方便测试，我们设置本机host映射关系如下：
+127.0.0.1 rookie-authorization.client.com
+127.0.0.1 rookie-authorization.server.com
+127.0.0.1 rookie-authorization.resource.com
+
+
+在启动的时候实例化有如下类：
+OAuth2ResourceServerJwtConfiguration
+JwkSetUriJwtDecoderBuilderCustomizer
+OAuth2ResourceServerAutoConfiguration
+Oauth2ResourceServerConfiguration
+OAuth2ResourceServerJwtConfiguration
+OAuth2ResourceServerOpaqueTokenConfiguration
+
+首先换取token等信息：
+
+
+请求地址：http://rookie-authorization.resource.com:8100/test01
+
+经过的过滤器：
+Security filter chain: [
+  DisableEncodeUrlFilter
+  WebAsyncManagerIntegrationFilter
+  SecurityContextHolderFilter
+  HeaderWriterFilter
+  CorsFilter
+  CsrfFilter
+  LogoutFilter
+  BearerTokenAuthenticationFilter
+  RequestCacheAwareFilter
+  SecurityContextHolderAwareRequestFilter
+  AnonymousAuthenticationFilter
+  ExceptionTranslationFilter
+  AuthorizationFilter
+]
+
+通过 http://rookie-authorization.server.com:8080/oauth2/jwks 获取请求的认证信息key
+这个是通过NimbusJwtDecoder#processor调用的
+
+OAuth2ResourceServerJwtConfiguration#jwtDecoderByIssuerUri()-->RemoteJWKSet#updateJWKSetFromURL()->
