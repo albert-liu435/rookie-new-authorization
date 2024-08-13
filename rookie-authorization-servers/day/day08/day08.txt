@@ -7,17 +7,106 @@
 
 
 
+
 机制说明
 看到这里可能有些读者会比较疑惑，比如框架怎么知道认证服务器授权接口的地址？框架怎么知道认证服务获取token的接口？项目在初始化时会根据配置的issuer-uri拼接url，即签发地址根目录/.well-known/openid-configuration，像项目中配置的就是http://rookie-authorization.server.com:8080/.well-known/openid-configuration ；该接口会返回认证服务器的元信息
 
 
 签发地址目录: http://rookie-authorization.server.com:8080/.well-known/openid-configuration
 
+1、访问受限资源
 第一次请求
 http://rookie-authorization.client.com:8000/app
-经过OAuth2AuthorizationRequestRedirectFilter过滤器,由于是第一次请求，所以都会放行，最后经过ExceptionTranslationFilter过滤器,抛出的异常为org.springframework.security.access.AccessDeniedException: Access Denied，然后通过LoginUrlAuthenticationEntryPoint进行构建重定向url:http://rookie-authorization.client.com:8000/oauth2/authorization/messaging-client-oidc,这个url地址是在启动的时候，由getLoginLinks#getLoginLinks方法生成的。紧接着会再次经过OAuth2AuthorizationRequestRedirectFilter过滤器，然后通过DefaultOAuth2AuthorizationRequestResolver#resolve()方法获取registrationId为messaging-client-oidc,从请求中获取action参数的值，如果不存在，则默认为login，然后查询出ClientRegistration，构建重定向页面 http://rookie-authorization.client.com:8000/login/oauth2/code/messaging-client-oidc,认证请求为http://rookie-authorization.server.com:8080/oauth2/authorize?response_type=code&client_id=messaging-client&scope=message.read message.write openid profile&state=OTPZEg9a-oax7O14UO7Ps3PRnNH95LOD-D-gfcBPnVI=&redirect_uri=http://rookie-authorization.client.com:8000/login/oauth2/code/messaging-client-oidc&nonce=tjLdamjgaCuZLOF9n5uvxpFPfo7g0HO-Pt8ce-fDLus,这个地址类似我们最早之前进行换取code的地址。
+经过OAuth2AuthorizationRequestRedirectFilter过滤器,由于是第一次请求，所以都会放行，最后经过ExceptionTranslationFilter过滤器,抛出的异常为org.springframework.security.access.AccessDeniedException: Access Denied，
+
+
+过滤器：
+Security filter chain: [
+  DisableEncodeUrlFilter
+  WebAsyncManagerIntegrationFilter
+  SecurityContextHolderFilter
+  HeaderWriterFilter
+  CorsFilter
+  CsrfFilter
+  LogoutFilter
+  OAuth2AuthorizationRequestRedirectFilter
+  OAuth2AuthorizationRequestRedirectFilter
+  OAuth2LoginAuthenticationFilter
+  DefaultLoginPageGeneratingFilter
+  DefaultLogoutPageGeneratingFilter
+  RequestCacheAwareFilter
+  SecurityContextHolderAwareRequestFilter
+  AnonymousAuthenticationFilter
+  OAuth2AuthorizationCodeGrantFilter
+  ExceptionTranslationFilter
+  AuthorizationFilter
+]
+
+
+
+2、重定向至认证服务请求授权
+然后通过LoginUrlAuthenticationEntryPoint进行构建重定向url:http://rookie-authorization.client.com:8000/oauth2/authorization/messaging-client-oidc,这个url地址是在启动的时候，由getLoginLinks#getLoginLinks方法生成的。紧接着会再次经过OAuth2AuthorizationRequestRedirectFilter过滤器，然后通过DefaultOAuth2AuthorizationRequestResolver#resolve()方法获取registrationId为messaging-client-oidc,
+从请求中获取action参数的值，如果不存在，则默认为login，然后查询出ClientRegistration，构建重定向页面 http://rookie-authorization.server.com:8080/oauth2/authorize?response_type=code&client_id=messaging-client&scope=message.read%20message.write%20openid%20profile&state=akfq_N6A5KM6580XXc_D-TI7OZZpWIoZHXR-g27kcOY%3D&redirect_uri=http://rookie-authorization.client.com:8000/login/oauth2/code/messaging-client-oidc&nonce=ptHbX9Tqn6Wl_Z3mSuU8_JXvTs0oU9cFS7JhLz2TK6s,这个地址类似我们最早之前进行换取code的地址。
+
+
+
+
+Security filter chain: [
+  DisableEncodeUrlFilter
+  WebAsyncManagerIntegrationFilter
+  SecurityContextHolderFilter
+  HeaderWriterFilter
+  CorsFilter
+  CsrfFilter
+  LogoutFilter
+  OAuth2AuthorizationRequestRedirectFilter
+  OAuth2AuthorizationRequestRedirectFilter
+  OAuth2LoginAuthenticationFilter
+  DefaultLoginPageGeneratingFilter
+  DefaultLogoutPageGeneratingFilter
+  RequestCacheAwareFilter
+  SecurityContextHolderAwareRequestFilter
+  AnonymousAuthenticationFilter
+  OAuth2AuthorizationCodeGrantFilter
+  ExceptionTranslationFilter
+  AuthorizationFilter
+]
+
+3、检测未登录,重定向至登录页面
+4、用户提交账号和密码
 输入账号密码后，点击进行登录，会进行第二次回调到客户端,进行code换取token的操作
-具体逻辑是由OAuth2LoginAuthenticationFilter进行处理的
+具体逻辑是由OAuth2LoginAuthenticationFilter进行处理的，会获取请求的参数，并通过OidcAuthorizationCodeAuthenticationProvider进行校验，通过DefaultAuthorizationCodeTokenResponseClient调用服务端进行换取token信息，并调用服务端获取用户的权限信息，并将认证的集合信息放入到InMemoryOAuth2AuthorizedClientService的属性authorizedClients中
+
+5、认证完成后重定向至授权接口
+6、security client实现了code换取token的接口:/login/oauth2/code/* 携带code重定向至回调地址
+7、携带code和客户端信息请求token接口
+8、认证服务返回access_token
+9、重定向至受限资源
+10、返回接口执行结果
+等待下次请求的时候，会从HttpSessionSecurityContextRepository 中的session等信息获取认证信息进行处理
+
+Security filter chain: [
+  DisableEncodeUrlFilter
+  WebAsyncManagerIntegrationFilter
+  SecurityContextHolderFilter
+  HeaderWriterFilter
+  CorsFilter
+  CsrfFilter
+  LogoutFilter
+  OAuth2AuthorizationRequestRedirectFilter
+  OAuth2AuthorizationRequestRedirectFilter
+  OAuth2LoginAuthenticationFilter
+  DefaultLoginPageGeneratingFilter
+  DefaultLogoutPageGeneratingFilter
+  RequestCacheAwareFilter
+  SecurityContextHolderAwareRequestFilter
+  AnonymousAuthenticationFilter
+  OAuth2AuthorizationCodeGrantFilter
+  ExceptionTranslationFilter
+  AuthorizationFilter
+]
+
+
 
 
 
