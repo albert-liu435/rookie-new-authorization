@@ -1,4 +1,4 @@
-package com.rookie.bigdata.authorization;
+package com.rookie.bigdata.authorization.device;
 
 import org.springframework.lang.Nullable;
 import org.springframework.security.core.Transient;

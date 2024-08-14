@@ -1,6 +1,6 @@
-package com.rookie.bigdata.authorization.web.authentication;
+package com.rookie.bigdata.authorization.device;
 
-import com.rookie.bigdata.authorization.DeviceClientAuthenticationToken;
+import com.rookie.bigdata.authorization.device.DeviceClientAuthenticationToken;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpMethod;
 import org.springframework.lang.Nullable;
