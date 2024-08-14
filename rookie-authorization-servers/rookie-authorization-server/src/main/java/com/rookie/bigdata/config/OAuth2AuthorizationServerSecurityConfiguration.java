@@ -6,6 +6,9 @@ import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import com.rookie.bigdata.authorization.device.DeviceClientAuthenticationProvider;
+import com.rookie.bigdata.authorization.sms.SmsCaptchaGrantAuthenticationConverter;
+import com.rookie.bigdata.authorization.sms.SmsCaptchaGrantAuthenticationProvider;
+import com.rookie.bigdata.constant.SecurityConstants;
 import com.rookie.bigdata.util.KeyUtils;
 import com.rookie.bigdata.authorization.device.DeviceClientAuthenticationConverter;
 import com.rookie.bigdata.util.SecurityUtils;
@@ -14,6 +17,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.annotation.Secured;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -43,9 +47,11 @@ import org.springframework.security.oauth2.server.authorization.settings.ClientS
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.web.DefaultSecurityFilterChain;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -146,7 +152,35 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
                 .oauth2ResourceServer((resourceServer) -> resourceServer
                         .jwt(Customizer.withDefaults()));
 
-        return http.build();
+
+        //最终会通过OAuth2TokenEndpointFilter过滤器
+        // 自定义短信认证登录转换器
+        SmsCaptchaGrantAuthenticationConverter converter = new SmsCaptchaGrantAuthenticationConverter();
+        // 自定义短信认证登录认证提供
+        SmsCaptchaGrantAuthenticationProvider provider = new SmsCaptchaGrantAuthenticationProvider();
+        http.getConfigurer(OAuth2AuthorizationServerConfigurer.class)
+                // 让认证服务器元数据中有自定义的认证方式
+                .authorizationServerMetadataEndpoint(metadata -> metadata.authorizationServerMetadataCustomizer(customizer -> customizer.grantType(SecurityConstants.GRANT_TYPE_SMS_CODE)))
+                // 添加自定义grant_type——短信认证登录
+                .tokenEndpoint(tokenEndpoint -> tokenEndpoint
+                        .accessTokenRequestConverter(converter)
+                        .authenticationProvider(provider));
+
+        DefaultSecurityFilterChain build = http.build();
+
+        // 从框架中获取provider中所需的bean
+        OAuth2TokenGenerator<?> tokenGenerator = http.getSharedObject(OAuth2TokenGenerator.class);
+        AuthenticationManager authenticationManager = http.getSharedObject(AuthenticationManager.class);
+        OAuth2AuthorizationService authorizationService = http.getSharedObject(OAuth2AuthorizationService.class);
+        // 以上三个bean在build()方法之后调用是因为调用build方法时框架会尝试获取这些类，
+        // 如果获取不到则初始化一个实例放入SharedObject中，所以要在build方法调用之后获取
+        // 在通过set方法设置进provider中，但是如果在build方法之后调用authenticationProvider(provider)
+        // 框架会提示unsupported_grant_type，因为已经初始化完了，在添加就不会生效了
+        provider.setTokenGenerator(tokenGenerator);
+        provider.setAuthorizationService(authorizationService);
+        provider.setAuthenticationManager(authenticationManager);
+
+        return build;
     }
 
     /**
@@ -440,7 +474,8 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
     public AuthorizationServerSettings authorizationServerSettings() {
 //        return AuthorizationServerSettings.builder().build();
 
-        http://rookie-authorization.server.com:8080
+        http:
+//rookie-authorization.server.com:8080
         return AuthorizationServerSettings.builder()
                 /*
                     设置token签发地址(http(s)://{ip}:{port}/context-path, http(s)://domain.com/context-path)

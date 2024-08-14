@@ -1,0 +1,7 @@
+自定义一个认证逻辑主要有下面三步
+1、继承AbstractAuthenticationToken并定义一些属性
+2、实现AuthenticationConverter和AuthenticationProvider添加逻辑处理。
+3、将AuthenticationConverter和AuthenticationProvider添加至OAuth2 Token endpoint中。
+实际上就是在访问/oauth2/token接口时会先通过Converter生成一个token，然后再由ProviderManager根据生成的token去找到对应的Provider进行校验，成功以后会返回一个token，如下
+
+
