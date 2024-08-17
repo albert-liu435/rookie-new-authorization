@@ -1,10 +1,18 @@
 1、客户端模式
-客户端模式如图：
-1723102109959.png
-1723102263566.png
-同样会经过过滤器 OAuth2TokenEndpointFilter
-里面的方法Authentication authorizationGrantAuthentication = this.authenticationConverter.convert(request);会生成OAuth2ClientCredentialsAuthenticationToken
-然后通过OAuth2ClientCredentialsAuthenticationProvider进行认证并生成OAuth2AccessTokenAuthenticationToken返回给客户端
+    客户端模式如图：
+    1723102109959.png
+    1723102263566.png
+1.1 OAuth2ClientAuthenticationFilter
+    1.1.1   首先会经过OAuth2ClientAuthenticationFilter过滤器，然后经过ClientSecretBasicAuthenticationConverter，ClientSecretBasicAuthenticationConverter通过获取Header上面的Authorization的信息，将账号和密码的base64加密的信息如 Basic bWVzc2FnaW5nLWNsaWVudDoxMjM0NTY=  进行解密解析，解析为clientID和clientSecret 并封装到OAuth2ClientAuthenticationToken中返回。然后通过ClientSecretAuthenticationProvider进行 验证通过后封装成OAuth2ClientAuthenticationToken进行返回。
+1.2 OAuth2TokenEndpointFilter
+    前面经过OAuth2ClientAuthenticationFilter处理后，后面主要进入OAuth2TokenEndpointFilter过滤器进行处理。
+    1.2.1   匹配请求，然后获取grant_type和scope请求参数,随后进入到OAuth2ClientCredentialsAuthenticationConverter进行将请求转化为OAuth2ClientCredentialsAuthenticationToken并返回，然后通过OAuth2ClientCredentialsAuthenticationProvider认证并生成token返回。会由JwtGenerator生成Jwt,最后封装OAuth2AccessToken并返回给客户端
+
+
+PKCE模式跟前面的授权码模式类似
+
+
+
 
 
 PKCE模式：
