@@ -1,5 +1,57 @@
 请求如图：
 1723165344081.png
+
+请求流程
+
+1、获取设备码和登录信息
+    OAuth2ClientAuthenticationFilter
+    在config有一段如下代码：
+    //                .clientAuthentication(Customizer.withDefaults());
+                    .clientAuthentication(clientAu
+
+                    thentication ->
+                            // 客户端认证添加设备码的converter和provider
+                            clientAuthentication
+                                    .authenticationConverter(deviceClientAuthenticationConverter)
+                                    .authenticationProvider(deviceClientAuthenticationProvider)
+                    );
+    该段代码用于向OAuth2ClientAuthenticationFilter添加deviceClientAuthenticationConverter和deviceClientAuthenticationProvider
+    1.1 OAuth2ClientAuthenticationFilter
+        1.1.1 通过DelegatingAuthenticationConverter委托DeviceClientAuthenticationConverter将请求转化为DeviceClientAuthenticationToken，DeviceClientAuthenticationToken里面包含了clientId信息，然后通过DeviceClientAuthenticationProvider进行验证,验证通过后,封装成DeviceClientAuthenticationToken返回，后面主要由OAuth2DeviceAuthorizationEndpointFilter过滤器处理
+    1.2 OAuth2DeviceAuthorizationEndpointFilter
+        通过OAuth2DeviceAuthorizationEndpointFilter过滤器，OAuth2DeviceAuthorizationRequestAuthenticationConverter将请求转化为OAuth2DeviceAuthorizationRequestAuthenticationToken，里面封装了前一个过滤器处理转化后的DeviceClientAuthenticationToken,http://127.0.0.1:8080/oauth2/device_authorization和scope等信息，然后返回。进行验证由OAuth2DeviceAuthorizationRequestAuthenticationProvider处理，并返回OAuth2DeviceAuthorizationRequestAuthenticationToken，里面封装了code等信息
+2、浏览器登录验证http://127.0.0.1:8080/activate?user_code=HDDJ-VGNR
+
+
+Security filter chain: [
+  DisableEncodeUrlFilter
+  WebAsyncManagerIntegrationFilter
+  SecurityContextHolderFilter
+  AuthorizationServerContextFilter
+  HeaderWriterFilter
+  CorsFilter
+  CsrfFilter
+  OidcLogoutEndpointFilter
+  LogoutFilter
+  OAuth2AuthorizationServerMetadataEndpointFilter
+  OAuth2AuthorizationEndpointFilter
+  OAuth2DeviceVerificationEndpointFilter
+  OidcProviderConfigurationEndpointFilter
+  NimbusJwkSetEndpointFilter
+  OAuth2ClientAuthenticationFilter
+  BearerTokenAuthenticationFilter
+  RequestCacheAwareFilter
+  SecurityContextHolderAwareRequestFilter
+  AnonymousAuthenticationFilter
+  ExceptionTranslationFilter
+  AuthorizationFilter
+  OAuth2TokenEndpointFilter
+  OAuth2TokenIntrospectionEndpointFilter
+  OAuth2TokenRevocationEndpointFilter
+  OAuth2DeviceAuthorizationEndpointFilter
+  OidcUserInfoEndpointFilter
+]
+
 请求流程中 首先经过OAuth2ClientAuthenticationFilter过滤器，通过DeviceClientAuthenticationConverter进行转换为DeviceClientAuthenticationToken并经过DeviceClientAuthenticationProvider验证通过
 然后经过OAuth2DeviceAuthorizationEndpointFilter过滤器,通过OAuth2DeviceAuthorizationRequestAuthenticationConverter转换为OAuth2DeviceAuthorizationRequestAuthenticationToken并经过OAuth2DeviceAuthorizationRequestAuthenticationProvider验证后转为OAuth2DeviceAuthorizationRequestAuthenticationToken并返回前端，此时已经含有deviceCode和userCode等信息
 
