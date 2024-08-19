@@ -14,38 +14,30 @@
 
 签发地址目录: http://rookie-authorization.server.com:8080/.well-known/openid-configuration
 
+
+
+主要涉及到的类：
+org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2ClientAutoConfiguration
+org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2ClientRegistrationRepositoryConfiguration
+org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2WebSecurityConfiguration
+
+
+
+
+
 1、访问受限资源
-第一次请求
+1、第一次请求
 http://rookie-authorization.client.com:8000/app
-经过OAuth2AuthorizationRequestRedirectFilter过滤器,由于是第一次请求，所以都会放行，最后经过ExceptionTranslationFilter过滤器,抛出的异常为org.springframework.security.access.AccessDeniedException: Access Denied，
-
-
-过滤器：
-Security filter chain: [
-  DisableEncodeUrlFilter
-  WebAsyncManagerIntegrationFilter
-  SecurityContextHolderFilter
-  HeaderWriterFilter
-  CorsFilter
-  CsrfFilter
-  LogoutFilter
-  OAuth2AuthorizationRequestRedirectFilter
-  OAuth2AuthorizationRequestRedirectFilter
-  OAuth2LoginAuthenticationFilter
-  DefaultLoginPageGeneratingFilter
-  DefaultLogoutPageGeneratingFilter
-  RequestCacheAwareFilter
-  SecurityContextHolderAwareRequestFilter
-  AnonymousAuthenticationFilter
-  OAuth2AuthorizationCodeGrantFilter
-  ExceptionTranslationFilter
-  AuthorizationFilter
-]
-
+    1.1 OAuth2AuthorizationRequestRedirectFilter
+        1.1.1   首先通过DefaultOAuth2AuthorizationRequestResolver进行解析请求，将请求解析为OAuth2AuthorizationRequest，解析过程为获取registrationId，由于是第一次请求，所以该registrationId为空，返回null进入到下一个过滤器OAuth2LoginAuthenticationFilter
+    1.2   OAuth2LoginAuthenticationFilter
+        1.2.1   该请求首先判断是否需要认证，第一次为不需要，所以会进入到下一个过滤器，主要由ExceptionTranslationFilter过滤器处理
+    1.3 ExceptionTranslationFilter
+        1.3.1   抛出的异常为org.springframework.security.access.AccessDeniedException: Access Denied，经过ExceptionTranslationFilter#handleAccessDeniedException方法进行异常处理,由于没有进行认证，所以会通过sendStartAuthentication进行处理，通过LoginUrlAuthenticationEntryPoint进行重构url,http://rookie-authorization.client.com:8000/oauth2/authorization/messaging-client-oidc,这个url地址是在启动的时候，由OAuth2LoginConfigurer#getLoginLinks方法生成的
 
 
 2、重定向至认证服务请求授权
-然后通过LoginUrlAuthenticationEntryPoint进行构建重定向url:http://rookie-authorization.client.com:8000/oauth2/authorization/messaging-client-oidc,这个url地址是在启动的时候，由getLoginLinks#getLoginLinks方法生成的。紧接着会再次经过OAuth2AuthorizationRequestRedirectFilter过滤器，然后通过DefaultOAuth2AuthorizationRequestResolver#resolve()方法获取registrationId为messaging-client-oidc,
+然后通过LoginUrlAuthenticationEntryPoint进行构建重定向url:http://rookie-authorization.client.com:8000/oauth2/authorization/messaging-client-oidc,这个url地址是在启动的时候，由OAuth2LoginConfigurer#getLoginLinks方法生成的。紧接着会再次经过OAuth2AuthorizationRequestRedirectFilter过滤器，然后通过DefaultOAuth2AuthorizationRequestResolver#resolve()方法获取registrationId为messaging-client-oidc,
 从请求中获取action参数的值，如果不存在，则默认为login，然后查询出ClientRegistration，构建重定向页面 http://rookie-authorization.server.com:8080/oauth2/authorize?response_type=code&client_id=messaging-client&scope=message.read%20message.write%20openid%20profile&state=akfq_N6A5KM6580XXc_D-TI7OZZpWIoZHXR-g27kcOY%3D&redirect_uri=http://rookie-authorization.client.com:8000/login/oauth2/code/messaging-client-oidc&nonce=ptHbX9Tqn6Wl_Z3mSuU8_JXvTs0oU9cFS7JhLz2TK6s,这个地址类似我们最早之前进行换取code的地址。
 
 
