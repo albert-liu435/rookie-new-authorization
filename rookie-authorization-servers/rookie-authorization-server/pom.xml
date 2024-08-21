@@ -27,7 +27,7 @@
         <!-- 修复漏洞 -->
         <snakeyaml.version>2.0</snakeyaml.version>
         <!-- Mybatis Plus版本号 -->
-        <!--        <mybatis-plus.version>3.5.3.1</mybatis-plus.version>-->
+        <mybatis-plus.version>3.5.7</mybatis-plus.version>
         <!-- Mybatis Plus版本号 -->
         <webjars.bootstrap.version>5.2.3</webjars.bootstrap.version>
     </properties>
@@ -113,9 +113,6 @@
             <version>${webjars.bootstrap.version}</version>
         </dependency>
 
-
-
-
         <!-- 添加spring security cas支持
 这里需添加spring-security-cas依赖，
 否则启动时报java.lang.ClassNotFoundException: org.springframework.security.cas.jackson2.CasJackson2Module错误。
@@ -142,22 +139,42 @@
         <!--        </dependency>-->
 
         <!--引入持久层框架-->
-        <!--        <dependency>-->
-        <!--            <groupId>com.baomidou</groupId>-->
-        <!--            <artifactId>mybatis-plus-boot-starter</artifactId>-->
-        <!--            <version>${mybatis-plus.version}</version>-->
-        <!--        </dependency>-->
+<!--        <dependency>-->
+<!--            <groupId>com.baomidou</groupId>-->
+<!--            <artifactId>mybatis-plus-boot-starter</artifactId>-->
+<!--            <version>${mybatis-plus.version}</version>-->
+<!--        </dependency>-->
+
+        <!-- https://mvnrepository.com/artifact/com.baomidou/mybatis-plus-boot-starter -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-boot-starter</artifactId>
+            <version>${mybatis-plus.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.mybatis</groupId>
+                    <artifactId>mybatis-spring</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.mybatis</groupId>
+            <artifactId>mybatis-spring</artifactId>
+            <version>3.0.4</version>
+        </dependency>
+
+
         <!--引入持久层框架-->
-        <!--        <dependency>-->
-        <!--            <groupId>com.baomidou</groupId>-->
-        <!--            <artifactId>mybatis-plus-generator</artifactId>-->
-        <!--            <version>${mybatis-plus.version}</version>-->
-        <!--        </dependency>-->
-        <!--        <dependency>-->
-        <!--            <groupId>org.apache.velocity</groupId>-->
-        <!--            <artifactId>velocity-engine-core</artifactId>-->
-        <!--            <version>${velocity.version}</version>-->
-        <!--        </dependency>-->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-generator</artifactId>
+            <version>${mybatis-plus.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.velocity</groupId>
+            <artifactId>velocity-engine-core</artifactId>
+            <version>${velocity.version}</version>
+        </dependency>
 
 
         <!--        引入webjars和bootstrap，自定义登录页和确认页面时使用-->

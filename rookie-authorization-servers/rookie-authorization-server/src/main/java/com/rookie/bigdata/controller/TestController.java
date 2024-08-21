@@ -32,4 +32,11 @@ public class TestController {
         return "app";
     }
 
+
+    @GetMapping("/system")
+    public String system() {
+        return "system";
+    }
+
+
 }

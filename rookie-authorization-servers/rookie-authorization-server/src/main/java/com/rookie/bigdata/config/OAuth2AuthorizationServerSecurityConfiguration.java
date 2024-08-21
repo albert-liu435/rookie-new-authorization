@@ -12,6 +12,7 @@ import com.rookie.bigdata.constant.SecurityConstants;
 import com.rookie.bigdata.util.KeyUtils;
 import com.rookie.bigdata.authorization.device.DeviceClientAuthenticationConverter;
 import com.rookie.bigdata.util.SecurityUtils;
+import lombok.SneakyThrows;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
@@ -19,6 +20,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.annotation.Secured;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -287,6 +289,17 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
 
 
     /**
+     * 将AuthenticationManager注入ioc中，其它需要使用地方可以直接从ioc中获取
+     * @param authenticationConfiguration 导出认证配置
+     * @return AuthenticationManager 认证管理器
+     */
+    @Bean
+    @SneakyThrows
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) {
+        return authenticationConfiguration.getAuthenticationManager();
+    }
+
+    /**
      * 配置密码解析器，使用BCrypt的方式对密码进行加密和验证
      *
      * @return BCryptPasswordEncoder
@@ -494,15 +507,15 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
      * @param passwordEncoder 密码解析器
      * @return UserDetailsService
      */
-    @Bean
-    public UserDetailsService users(PasswordEncoder passwordEncoder) {
-        UserDetails user = User.withUsername("admin")
-                .password(passwordEncoder.encode("123456"))
-                .roles("admin", "normal", "unAuthentication")
-                .authorities("app", "web", "/test2", "/test3")
-                .build();
-        return new InMemoryUserDetailsManager(user);
-    }
+//    @Bean
+//    public UserDetailsService users(PasswordEncoder passwordEncoder) {
+//        UserDetails user = User.withUsername("admin")
+//                .password(passwordEncoder.encode("123456"))
+//                .roles("admin", "normal", "unAuthentication")
+//                .authorities("app", "web", "/test2", "/test3")
+//                .build();
+//        return new InMemoryUserDetailsManager(user);
+//    }
 
 }
 
