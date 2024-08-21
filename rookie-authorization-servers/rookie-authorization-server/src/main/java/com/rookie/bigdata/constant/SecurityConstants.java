@@ -8,7 +8,6 @@ package com.rookie.bigdata.constant;
  */
 public class SecurityConstants {
 
-
     /**
      * 登录方式入参名
      */
