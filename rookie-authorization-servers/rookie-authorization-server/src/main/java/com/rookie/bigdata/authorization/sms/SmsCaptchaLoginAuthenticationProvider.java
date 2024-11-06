@@ -99,14 +99,18 @@ public class SmsCaptchaLoginAuthenticationProvider extends CaptchaAuthentication
             // 获取存入session的验证码(UsernamePasswordAuthenticationToken的principal中现在存入的是手机号)
 
 //            String smsCaptcha = (String) request.getSession(Boolean.FALSE).getAttribute((String) authentication.getPrincipal());
-            String smsCaptcha = redisOperator.getAndDelete((SMS_CAPTCHA_PREFIX_KEY + authentication.getPrincipal()));
+//            String smsCaptcha = redisOperator.getAndDelete((SMS_CAPTCHA_PREFIX_KEY + authentication.getPrincipal()));
 
             //TODO 这里为了方便，直接将验证码写死为1234,生产环境不能这样做
+
+            String smsCaptcha = redisOperator.get((SMS_CAPTCHA_PREFIX_KEY + authentication.getPrincipal()));
 
             // 校验输入的验证码是否正确(UsernamePasswordAuthenticationToken的credentials中现在存入的是输入的验证码)
             if (!Objects.equals("1234", authentication.getCredentials())) {
                 throw new BadCredentialsException("The sms captcha is incorrect.");
             }
+            // 删除缓存
+            redisOperator.delete((SMS_CAPTCHA_PREFIX_KEY + authentication.getPrincipal()));
 
 
 //            if (!Objects.equals(smsCaptcha, authentication.getCredentials())) {
