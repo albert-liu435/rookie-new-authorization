@@ -1,10 +1,15 @@
 package com.rookie.bigdata.authorization.handler;
 
 import com.rookie.bigdata.constant.SecurityConstants;
+import com.rookie.bigdata.model.Result;
+import com.rookie.bigdata.util.JsonUtils;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.DefaultRedirectStrategy;
 import org.springframework.security.web.RedirectStrategy;
@@ -38,6 +43,23 @@ public class LoginTargetAuthenticationEntryPoint extends LoginUrlAuthenticationE
 
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException authException) throws IOException, ServletException {
+
+//        String deviceVerificationUri = "/oauth2/device_verification";
+//        // 兼容设备码前后端分离
+//        if (request.getRequestURI().equals(deviceVerificationUri)
+//                && request.getMethod().equals(HttpMethod.POST.name())
+//                && UrlUtils.isAbsoluteUrl(DEVICE_ACTIVATE_URI)) {
+//            // 如果是请求验证设备激活码(user_code)时未登录并且设备码验证页面是前后端分离的那种则写回json
+//            Result<String> success = Result.error(HttpStatus.UNAUTHORIZED.value(), ("登录已失效，请重新打开设备提供的验证地址"));
+//            response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+//            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+//            response.getWriter().write(JsonUtils.objectCovertToJson(success));
+//            response.getWriter().flush();
+//            return;
+//        }
+
+
+
         // 获取登录表单的地址
         String loginForm = determineUrlToUseForThisRequest(request, response, authException);
         if (!UrlUtils.isAbsoluteUrl(loginForm)) {

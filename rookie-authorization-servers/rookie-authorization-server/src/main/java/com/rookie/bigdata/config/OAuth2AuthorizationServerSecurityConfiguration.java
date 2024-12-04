@@ -109,7 +109,7 @@ public class OAuth2AuthorizationServerSecurityConfiguration {
      */
 //    private final String LOGIN_URL = "http://127.0.0.1:5173";
 
-    private final String LOGIN_URL = "http://rookie-authorization.vue.com:5173";
+    private final String LOGIN_URL = "http://rookie-authorization.vue.com:5173/login";
 
 
     private static final String CUSTOM_CONSENT_PAGE_URI = "/oauth2/consent";
