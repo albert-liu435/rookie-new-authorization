@@ -33,10 +33,4 @@ public class TestController {
     }
 
 
-    @GetMapping("/system")
-    public String system() {
-        return "system";
-    }
-
-
 }

@@ -20,7 +20,6 @@ import java.io.Serializable;
 @TableName("sys_role_authority")
 public class SysRoleAuthority implements Serializable {
 
-    @Serial
     private static final long serialVersionUID = 1L;
 
     /**

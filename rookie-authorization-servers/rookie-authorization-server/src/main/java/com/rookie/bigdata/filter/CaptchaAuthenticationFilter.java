@@ -63,17 +63,17 @@ public class CaptchaAuthenticationFilter extends GenericFilterBean {
         String code = request.getParameter("code");
         try {
             if (ObjectUtils.isEmpty(code)) {
-                throw new InvalidCaptchaException("The captcha cannot be empty.");
+                throw new InvalidCaptchaException("验证码不能为空.");
             }
 
             // 获取session中存储的验证码
             Object sessionCaptcha = request.getSession(Boolean.FALSE).getAttribute("captcha");
             if (sessionCaptcha instanceof String sessionCode) {
                 if (!sessionCode.equalsIgnoreCase(code)) {
-                    throw new InvalidCaptchaException("The captcha is incorrect.");
+                    throw new InvalidCaptchaException("验证码错误.");
                 }
             } else {
-                throw new InvalidCaptchaException("The captcha is abnormal. Obtain it again.");
+                throw new InvalidCaptchaException("验证码异常，请重新获取一次.");
             }
         } catch (AuthenticationException ex) {
             this.failureHandler.onAuthenticationFailure(request, response, ex);

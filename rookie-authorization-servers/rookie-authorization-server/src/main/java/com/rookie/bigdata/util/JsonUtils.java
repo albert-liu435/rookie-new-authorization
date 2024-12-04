@@ -30,10 +30,7 @@ public class JsonUtils {
         throw new UnsupportedOperationException("Utility classes cannot be instantiated.");
     }
 
-    /**
-     * 设置为public是为了提供给redis的序列化器
-     */
-    public final static ObjectMapper MAPPER = new ObjectMapper();
+    private final static ObjectMapper MAPPER = new ObjectMapper();
 
     static {
         // 对象的所有字段全部列入，还是其他的选项，可以忽略null等

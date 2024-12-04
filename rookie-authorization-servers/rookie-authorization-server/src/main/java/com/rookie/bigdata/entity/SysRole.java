@@ -20,7 +20,6 @@ import java.time.LocalDateTime;
 @TableName("sys_role")
 public class SysRole implements Serializable {
 
-    @Serial
     private static final long serialVersionUID = 1L;
 
     /**

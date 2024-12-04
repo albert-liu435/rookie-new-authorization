@@ -18,7 +18,6 @@ import java.time.LocalDateTime;
 @TableName("sys_authority")
 public class SysAuthority implements Serializable {
 
-    @Serial
     private static final long serialVersionUID = 1L;
 
     /**
@@ -65,7 +64,6 @@ public class SysAuthority implements Serializable {
     /**
      * 创建时间
      */
-    @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 
     /**

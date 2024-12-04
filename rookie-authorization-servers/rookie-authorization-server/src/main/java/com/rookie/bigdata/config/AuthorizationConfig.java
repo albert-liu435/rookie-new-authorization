@@ -15,6 +15,7 @@ import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import com.rookie.bigdata.authorization.device.DeviceClientAuthenticationConverter;
 import com.rookie.bigdata.authorization.device.DeviceClientAuthenticationProvider;
+import com.rookie.bigdata.authorization.federation.FederatedIdentityIdTokenCustomizer;
 import com.rookie.bigdata.authorization.handler.*;
 import com.rookie.bigdata.authorization.sms.SmsCaptchaGrantAuthenticationConverter;
 import com.rookie.bigdata.authorization.sms.SmsCaptchaGrantAuthenticationProvider;
@@ -59,6 +60,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.DefaultSecurityFilterChain;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.util.UrlUtils;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -73,6 +75,8 @@ import java.security.interfaces.RSAPublicKey;
 import java.security.spec.InvalidKeySpecException;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static com.rookie.bigdata.constant.SecurityConstants.LOGIN_PAGE_URI;
 
 /**
  * 认证配置
@@ -149,7 +153,7 @@ public class AuthorizationConfig {
                 // 当未登录时访问认证端点时重定向至login页面
                 .exceptionHandling((exceptions) -> exceptions
                         .defaultAuthenticationEntryPointFor(
-                                new LoginTargetAuthenticationEntryPoint(SecurityConstants.LOGIN_PAGE_URI),
+                                new LoginTargetAuthenticationEntryPoint(LOGIN_PAGE_URI),
                                 new MediaTypeRequestMatcher(MediaType.TEXT_HTML)
                         )
                 )
@@ -209,8 +213,8 @@ public class AuthorizationConfig {
                 .formLogin(formLogin ->
                         formLogin.loginProcessingUrl("/login")
                                 // 登录成功和失败改为写回json，不重定向了
-                                .successHandler(new LoginSuccessHandler(SecurityConstants.LOGIN_PAGE_URI))
-                                .failureHandler(new LoginFailureHandler(SecurityConstants.LOGIN_PAGE_URI))
+                                .successHandler(new LoginSuccessHandler(LOGIN_PAGE_URI))
+                                .failureHandler(new LoginFailureHandler(LOGIN_PAGE_URI))
                 );
         // 在UsernamePasswordAuthenticationFilter拦截器之前添加验证码校验拦截器，并拦截POST的登录接口
 //        http.addFilterBefore(new CaptchaAuthenticationFilter("/login"), UsernamePasswordAuthenticationFilter.class);
@@ -222,14 +226,22 @@ public class AuthorizationConfig {
                 .authenticationEntryPoint(SecurityUtils::exceptionHandler)
         );
 
-        http
-                // 当未登录时访问认证端点时重定向至login页面
-                .exceptionHandling((exceptions) -> exceptions
-                        .defaultAuthenticationEntryPointFor(
-                                new LoginTargetAuthenticationEntryPoint(SecurityConstants.LOGIN_PAGE_URI),
-                                new MediaTypeRequestMatcher(MediaType.TEXT_HTML)
-                        )
-                );
+        // 兼容前后端分离与不分离配置
+        if (UrlUtils.isAbsoluteUrl(LOGIN_PAGE_URI)) {
+            http
+                    // 当未登录时访问认证端点时重定向至login页面
+                    .exceptionHandling((exceptions) -> exceptions
+                            .defaultAuthenticationEntryPointFor(
+                                    new LoginTargetAuthenticationEntryPoint(LOGIN_PAGE_URI),
+                                    new MediaTypeRequestMatcher(MediaType.TEXT_HTML)
+                            )
+                    );
+        }
+        // 联合登录配置
+        http.oauth2Login(oauth2Login ->
+                oauth2Login
+                        .loginPage(LOGIN_PAGE_URI)
+        );
 
         return http.build();
     }
@@ -243,6 +255,7 @@ public class AuthorizationConfig {
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
+
 
     /**
      * 配置客户端Repository
@@ -424,30 +437,7 @@ public class AuthorizationConfig {
      */
     @Bean
     public OAuth2TokenCustomizer<JwtEncodingContext> oAuth2TokenCustomizer() {
-        return context -> {
-            // 检查登录用户信息是不是UserDetails，排除掉没有用户参与的流程
-            if (context.getPrincipal().getPrincipal() instanceof UserDetails user) {
-                // 获取申请的scopes
-                Set<String> scopes = context.getAuthorizedScopes();
-                // 获取用户的权限
-                Collection<? extends GrantedAuthority> authorities = user.getAuthorities();
-                // 提取权限并转为字符串
-                Set<String> authoritySet = Optional.ofNullable(authorities).orElse(Collections.emptyList()).stream()
-                        // 获取权限字符串
-                        .map(GrantedAuthority::getAuthority)
-                        // 去重
-                        .collect(Collectors.toSet());
-
-                // 合并scope与用户信息
-                authoritySet.addAll(scopes);
-
-                JwtClaimsSet.Builder claims = context.getClaims();
-                // 将权限信息放入jwt的claims中（也可以生成一个以指定字符分割的字符串放入）
-                claims.claim("authorities", authoritySet);
-                // 放入其它自定内容
-                // 角色、头像...
-            }
-        };
+        return new FederatedIdentityIdTokenCustomizer();
     }
 
     /**
@@ -461,7 +451,7 @@ public class AuthorizationConfig {
         // 设置解析权限信息的前缀，设置为空是去掉前缀
         grantedAuthoritiesConverter.setAuthorityPrefix("");
         // 设置权限信息在jwt claims中的key
-        grantedAuthoritiesConverter.setAuthoritiesClaimName("authorities");
+        grantedAuthoritiesConverter.setAuthoritiesClaimName(SecurityConstants.AUTHORITIES_KEY);
 
         JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();
         jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(grantedAuthoritiesConverter);
@@ -482,6 +472,7 @@ public class AuthorizationConfig {
         // 设置允许跨域的域名,如果允许携带cookie的话,路径就不能写*号, *表示所有的域名都可以跨域访问
         config.addAllowedOrigin("http://127.0.0.1:5173");
         config.addAllowedOrigin("http://172.20.10.3:5173");
+        config.addAllowedOrigin("http://192.168.2.211:5173");
         // 设置跨域访问可以携带cookie
         config.setAllowCredentials(true);
         source.registerCorsConfiguration("/**", config);

@@ -34,7 +34,7 @@ import java.util.Map;
 public class SecurityUtils {
 
     private SecurityUtils() {
-        //禁止实例化工具类
+        // 禁止实例化工具类
         throw new UnsupportedOperationException("Utility classes cannot be instantiated.");
     }
 
@@ -87,7 +87,7 @@ public class SecurityUtils {
     }
 
     /**
-     * 认证失败和鉴权回调
+     * 认证与鉴权失败回调
      *
      * @param request  当前请求
      * @param response 当前响应
@@ -107,18 +107,17 @@ public class SecurityUtils {
     }
 
     /**
-     * 获取异常信息
+     * 获取异常信息map
      *
      * @param request  当前请求
      * @param response 当前响应
      * @param e        本次异常具体的异常实例
      * @return 异常信息map
      */
-    public static Map<String, String> getErrorParameter(HttpServletRequest request, HttpServletResponse response, Throwable e) {
-
+    private static Map<String, String> getErrorParameter(HttpServletRequest request, HttpServletResponse response, Throwable e) {
         Map<String, String> parameters = new LinkedHashMap<>();
         if (request.getUserPrincipal() instanceof AbstractOAuth2TokenAuthenticationToken) {
-            //权限不足
+            // 权限不足
             parameters.put("error", BearerTokenErrorCodes.INSUFFICIENT_SCOPE);
             parameters.put("error_description",
                     "The request requires higher privileges than provided by the access token.");
@@ -175,5 +174,4 @@ public class SecurityUtils {
         }
         return wwwAuthenticate.toString();
     }
-
 }

@@ -42,15 +42,9 @@ public class SmsCaptchaGrantAuthenticationToken extends AbstractAuthenticationTo
                                               @Nullable Set<String> scopes,
                                               @Nullable Map<String, Object> additionalParameters) {
         super(Collections.emptyList());
-        this.scopes = Collections.unmodifiableSet(
-                scopes != null ?
-                        new HashSet<>(scopes) :
-                        Collections.emptySet());
+        this.scopes = scopes;
         this.clientPrincipal = clientPrincipal;
-        this.additionalParameters = Collections.unmodifiableMap(
-                additionalParameters != null ?
-                        new HashMap<>(additionalParameters) :
-                        Collections.emptyMap());
+        this.additionalParameters = additionalParameters;
         this.authorizationGrantType = authorizationGrantType;
     }
 

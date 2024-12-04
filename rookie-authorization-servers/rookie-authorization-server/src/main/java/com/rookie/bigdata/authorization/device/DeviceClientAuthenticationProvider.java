@@ -1,5 +1,6 @@
 package com.rookie.bigdata.authorization.device;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.core.Authentication;
@@ -21,16 +22,16 @@ import org.springframework.util.Assert;
  * @Version 1.0
  */
 @Slf4j
+@RequiredArgsConstructor
 public final class DeviceClientAuthenticationProvider implements AuthenticationProvider {
-    private static final String ERROR_URI = "https://datatracker.ietf.org/doc/html/rfc6749#section-3.2.1";
-    //    private final Log logger = LogFactory.getLog(getClass());
+
     private final RegisteredClientRepository registeredClientRepository;
 
+    /**
+     * 异常说明地址
+     */
+    private static final String ERROR_URI = "https://datatracker.ietf.org/doc/html/rfc6749#section-3.2.1";
 
-    public DeviceClientAuthenticationProvider(RegisteredClientRepository registeredClientRepository) {
-        Assert.notNull(registeredClientRepository, "registeredClientRepository cannot be null");
-        this.registeredClientRepository = registeredClientRepository;
-    }
 
     @Override
     public Authentication authenticate(Authentication authentication) throws AuthenticationException {
@@ -49,8 +50,8 @@ public final class DeviceClientAuthenticationProvider implements AuthenticationP
             throwInvalidClient(OAuth2ParameterNames.CLIENT_ID);
         }
 
-        if (this.log.isTraceEnabled()) {
-            this.log.trace("Retrieved registered client");
+        if (log.isTraceEnabled()) {
+            log.trace("Retrieved registered client");
         }
 
         //校验客户端
@@ -59,12 +60,12 @@ public final class DeviceClientAuthenticationProvider implements AuthenticationP
             throwInvalidClient("authentication_method");
         }
 
-        if (this.log.isTraceEnabled()) {
-            this.log.trace("Validated device client authentication parameters");
+        if (log.isTraceEnabled()) {
+            log.trace("Validated device client authentication parameters");
         }
 
-        if (this.log.isTraceEnabled()) {
-            this.log.trace("Authenticated device client");
+        if (log.isTraceEnabled()) {
+            log.trace("Authenticated device client");
         }
 
         return new DeviceClientAuthenticationToken(registeredClient,
@@ -73,6 +74,7 @@ public final class DeviceClientAuthenticationProvider implements AuthenticationP
 
     @Override
     public boolean supports(Class<?> authentication) {
+        // 只处理设备码请求
         return DeviceClientAuthenticationToken.class.isAssignableFrom(authentication);
     }
 

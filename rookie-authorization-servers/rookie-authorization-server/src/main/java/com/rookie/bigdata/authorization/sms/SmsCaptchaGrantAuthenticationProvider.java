@@ -28,6 +28,7 @@ import org.springframework.security.oauth2.server.authorization.token.OAuth2Toke
 import org.springframework.util.Assert;
 import org.springframework.util.ObjectUtils;
 
+import java.security.Principal;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -84,7 +85,13 @@ public class SmsCaptchaGrantAuthenticationProvider implements AuthenticationProv
 
         // Initialize the OAuth2Authorization
         OAuth2Authorization.Builder authorizationBuilder = OAuth2Authorization.withRegisteredClient(registeredClient)
-                .principalName(clientPrincipal.getName())
+                // 2023-07-15修改逻辑，加入当前用户认证信息，防止刷新token时因获取不到认证信息而抛出空指针异常
+                // 存入授权scope
+                .authorizedScopes(authorizedScopes)
+                // 当前授权用户名称
+                .principalName(authenticate.getName())
+                // 设置当前用户认证信息
+                .attribute(Principal.class.getName(), authenticate)
                 .authorizationGrantType(authenticationToken.getAuthorizationGrantType());
 
         // ----- Access token -----

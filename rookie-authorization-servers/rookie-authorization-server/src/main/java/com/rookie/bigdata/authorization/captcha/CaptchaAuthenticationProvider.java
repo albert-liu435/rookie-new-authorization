@@ -1,4 +1,4 @@
-package com.rookie.bigdata.authorization.captcha.dao;
+package com.rookie.bigdata.authorization.captcha;
 
 import com.rookie.bigdata.constant.SecurityConstants;
 import com.rookie.bigdata.exception.InvalidCaptchaException;
@@ -31,11 +31,9 @@ import static com.rookie.bigdata.constant.RedisConstants.IMAGE_CAPTCHA_PREFIX_KE
  * @Version 1.0
  */
 @Slf4j
-//@Component
 public class CaptchaAuthenticationProvider extends DaoAuthenticationProvider {
 
     private final RedisOperator<String> redisOperator;
-
 
     /**
      * 利用构造方法在通过{@link Component}注解初始化时
@@ -62,11 +60,8 @@ public class CaptchaAuthenticationProvider extends DaoAuthenticationProvider {
         }
         HttpServletRequest request = ((ServletRequestAttributes) requestAttributes).getRequest();
 
-
         // 获取当前登录方式
-//        String loginType = request.getParameter("loginType");
         String loginType = request.getParameter(SecurityConstants.LOGIN_TYPE_NAME);
-
         if (!Objects.equals(loginType, SecurityConstants.PASSWORD_LOGIN_TYPE)) {
             // 只要不是密码登录都不需要校验图形验证码
             log.info("It isn't necessary captcha authenticate.");
@@ -74,18 +69,14 @@ public class CaptchaAuthenticationProvider extends DaoAuthenticationProvider {
         }
 
         // 获取参数中的验证码
-//        String code = request.getParameter("code");
         String code = request.getParameter(SecurityConstants.CAPTCHA_CODE_NAME);
-
         if (ObjectUtils.isEmpty(code)) {
             throw new InvalidCaptchaException("The captcha cannot be empty.");
         }
 
         String captchaId = request.getParameter(SecurityConstants.CAPTCHA_ID_NAME);
         // 获取缓存中存储的验证码
-//        String captchaCode = redisOperator.getAndDelete((IMAGE_CAPTCHA_PREFIX_KEY + captchaId));
-        String captchaCode = redisOperator.get((IMAGE_CAPTCHA_PREFIX_KEY + captchaId));
-
+        String captchaCode = redisOperator.getAndDelete((IMAGE_CAPTCHA_PREFIX_KEY + captchaId));
         if (!ObjectUtils.isEmpty(captchaCode)) {
             if (!captchaCode.equalsIgnoreCase(code)) {
                 throw new InvalidCaptchaException("The captcha is incorrect.");
@@ -94,19 +85,7 @@ public class CaptchaAuthenticationProvider extends DaoAuthenticationProvider {
             throw new InvalidCaptchaException("The captcha is abnormal. Obtain it again.");
         }
 
-//        // 获取session中存储的验证码
-//        Object sessionCaptcha = request.getSession(Boolean.FALSE).getAttribute("captcha");
-//        if (sessionCaptcha instanceof String sessionCode) {
-//            if (!sessionCode.equalsIgnoreCase(code)) {
-//                throw new InvalidCaptchaException("The captcha is incorrect.");
-//            }
-//        } else {
-//            throw new InvalidCaptchaException("The captcha is abnormal. Obtain it again.");
-//        }
-        // 删除缓存
-        redisOperator.delete((IMAGE_CAPTCHA_PREFIX_KEY + captchaId));
         log.info("Captcha authenticated.");
         return super.authenticate(authentication);
     }
 }
-
