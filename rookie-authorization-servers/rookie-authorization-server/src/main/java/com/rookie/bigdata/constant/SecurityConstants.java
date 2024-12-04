@@ -63,4 +63,26 @@ public class SecurityConstants {
      */
     public static final String OAUTH_PARAMETER_NAME_SMS_CAPTCHA = "sms_captcha";
 
+
+
+    /**
+     * 授权确认页面地址
+     */
+    public static final String LOGIN_PAGE_URI = "http://127.0.0.1:5173/login";
+
+    /**
+     * 授权确认页面地址
+     */
+    public static final String DEVICE_ACTIVATED_URI = "http://127.0.0.1:5173/activated";
+
+    /**
+     * 授权确认页面地址
+     */
+    public static final String DEVICE_ACTIVATE_URI = "http://127.0.0.1:5173/activate";
+
+    /**
+     * 授权确认页面地址
+     */
+    public static final String CONSENT_PAGE_URI = "http://127.0.0.1:5173/consent";
+
 }

@@ -1,6 +1,11 @@
 server:
   port: 8080
-
+  servlet:
+    # Spring Session相关配置
+    session:
+      cookie:
+        # 如果访问前端的ip(域名)和前端axios请求的ip(域名)一致，则这里不用配置，使用域名的情况下最好配置一下顶级域名，例如xxx.com
+        domain: 127.0.0.1
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -111,3 +116,6 @@ mybatis-plus:
   # 扫描mapper文件
   mapper-locations:
     - classpath:com/rookie/bigdata/mapper/xml/*Mapper.xml
+
+
+

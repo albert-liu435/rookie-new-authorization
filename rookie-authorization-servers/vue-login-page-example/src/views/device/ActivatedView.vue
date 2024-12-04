@@ -1,7 +1,13 @@
 <script lang="ts" setup></script>
 <template>
   <header>
-    <img alt="Vue logo" class="logo" src="../../assets/devices.png" width="125" height="125" />
+    <img
+      alt="Vue logo"
+      class="logo"
+      src="../../assets/devices.png"
+      width="125"
+      height="125"
+    />
 
     <div class="wrapper">
       <HelloWorld msg="设备激活" />
@@ -50,4 +56,3 @@ h3,
   font-weight: bold !important;
 }
 </style>
-
